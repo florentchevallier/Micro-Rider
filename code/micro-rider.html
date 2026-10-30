@@ -70,6 +70,7 @@ input[type=range]{width:100%;accent-color:#64e1d4}
     <h1>micro rider</h1>
     <button id="bPleinEcran" aria-pressed="false" title="Show the page full screen (Esc to exit)">⤢ Full screen</button>
     <button id="bReglages" aria-expanded="false" aria-controls="reglages" title="Show or hide the settings (files, FTP, output, surface, sounds…) to leave more room for the animation">Settings ▾</button>
+    <span class="volgen" style="display:flex;align-items:center;gap:6px"><button id="bMuet" aria-pressed="false" title="Mute / unmute all sound">🔊</button><input type="range" id="volGeneral" min="0" max="100" style="width:80px" title="Master volume of Micro-Rider (all its sounds), without touching the computer volume or your video" aria-label="Master volume"></span>
     <span class="sep"></span>
     <button id="bTrainer" class="conn"><span class="txt">Connect trainer</span></button>
     <button id="bFc" class="conn"><span class="txt">Connect heart rate</span></button>
@@ -96,6 +97,7 @@ input[type=range]{width:100%;accent-color:#64e1d4}
       <input id="fichier" type="file" accept=".zwo,.mrc,.erg,.json" hidden></label>
     <button id="bDossier" type="button" hidden title="Workout folder (.zwo, .mrc, .erg, .json), remembered: no need to reload the files">Workout folder…</button>
     <button id="bDossierAutre" type="button" hidden title="Pick another workout folder">Other folder…</button>
+    <button id="bGithub" type="button" title="Add the Zwift workouts (.zwo) of the public GitHub repository bdcheung/zwift_workouts to the workout list; each one downloads when you pick it">Zwift workouts (GitHub)</button>
     <label>FTP <input id="ftp" type="number" min="50" max="600" step="5" value="250"> W</label>
     <label>Max HR <input id="fcmax" type="number" min="100" max="230" step="1" value="190"> bpm</label>
     <span class="sep"></span>
@@ -123,7 +125,7 @@ input[type=range]{width:100%;accent-color:#64e1d4}
       <label title="Cabinet controls rendering (real sprites for the 90s cabinet, full view)">Controls <select id="commandes"><option value="sprites">sprites only</option><option value="sprites-halos">sprites + halos</option><option value="halos">halos only</option></select></label>
     </span>
     <span class="sep"></span>
-    <span id="optSons" style="display:flex;gap:8px;align-items:center"><button id="bMuet" aria-pressed="false" title="Mute all sound">🔊</button>
+    <span id="optSons" style="display:flex;gap:8px;align-items:center">
       <label title="Pedalling noise volume">Pedalling <input type="range" id="volPedalage" min="0" max="100" style="width:64px"></label>
       <label title="Freewheel volume">Freewheel <input type="range" id="volRouelibre" min="0" max="100" style="width:64px"></label>
       <label title="Birds volume">Birds <input type="range" id="volOiseaux" min="0" max="100" style="width:64px"></label>

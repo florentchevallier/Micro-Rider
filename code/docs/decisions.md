@@ -306,3 +306,15 @@ Application `micro-rider.html` (jalon 3) : modes Promenade et Arcade, voir la se
 ### r30d — Sprites en vue « jeu » : recouvrement recalé et fondu ; Opera accepté
 - Le recouvrement de la vue jeu (r30c) posait le panneau de la vue menu avec un mauvais décalage : l'ancien joystick restait visible sous le sprite (double boule). Les images menu / jeu ne sont pas un simple décalage l'une de l'autre : décalages mesurés par recalage (joystick (−1, +277), boutons (−5, +277)) et zones recouvertes limitées au joystick et aux boutons, à bords fondus (`patchJeu`), le cadran central restant celui de l'image. Reste un léger défaut près de l'aile droite : une image `annees-90-jeu` sans commandes (même méthode que `borne-sans-commandes.png`) donnerait un rendu parfait.
 - Le Bluetooth Web fonctionne aussi dans Opera / Opera GX (Florent) : textes de `start.html` et de l'application mis à jour.
+
+## r31 — Séances Zwift (.zwo) du dépôt GitHub bdcheung/zwift_workouts
+- Réglages : bouton **Zwift workouts (GitHub)** : un appel à l'API GitHub (arbre du dépôt, branche `master` puis `main`) liste tous les `.zwo` ; ils apparaissent dans la liste des séances, groupe « Zwift workouts (GitHub: …) ». Chaque fichier n'est téléchargé (raw.githubusercontent.com) qu'au moment où on le choisit (même mécanisme paresseux que le dossier local : `paresseux.getFile`).
+- La liste est mémorisée (`micro-rider.github`) : elle revient au rechargement sans réseau, et la séance GitHub choisie est retéléchargée au démarrage. Limite de débit de l'API non authentifiée (60 appels/h) : message clair.
+- Dépôt de référence : 39 `.zwo` à la racine au moment de l'écriture, noms avec espaces/parenthèses (encodés dans l'URL). Lien vers le dépôt dans le guide de `start.html`. Test : `e2e_github.py` (11, API mockée).
+
+### r31b — Volume général
+- Curseur 🔊 dans l'en-tête (à droite de « Settings ») : volume général de **tous** les sons de Micro-Rider (gain maître de `son.js`, `fixerGeneral`, mémorisé `micro-rider.vol-general`), pour baisser le jeu et entendre une vidéo sans toucher au volume de l'ordinateur. Indépendant des volumes par son (Pedalling, Freewheel, Birds, Car, Games) et du bouton muet. Test dans `e2e_son.py` (16).
+
+### r31c — 🔊 de l'en-tête = muet
+- Le bouton 🔊 / 🔇 (muet) quitte les réglages et passe dans l'en-tête, collé au curseur de volume général : un clic coupe / rétablit tout le son. Le curseur est grisé pendant le muet. Les volumes par son (réglages) restent là, pour plus tard on précisera qu'ils sont indépendants.
+- Borne par défaut : vue « menu » = **Small screen** (libellé du bouton bascule) ; Chain Four reste en petit écran, la bataille navale passe la borne en grand écran (`vue: "jeu"`).

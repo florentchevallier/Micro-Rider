@@ -54,6 +54,13 @@ with sync_playwright() as p:
     check("voiture : départ hors image à droite, son lancé seulement quand elle roule", r.get("sons0") == 0 and r.get("sons1") == 1 and r["x0"] > 1500, r)
     check("voiture : au bout de 5 s (croisement du son), elle est à hauteur des cyclistes (x ≈ 205)", abs(r["x5"] - 205) < 60, r)
     check("voiture : à l'arrêt elle reste figée et le son est mis en pause ; il reprend en repédalant, sans relancer", r["pausesArret"] == [True] and r["pausesFin"] == [True, False] and r["sonsFin"] == 1, r)
+    # volume général : curseur dans l'en-tête, mémorisé, indépendant des volumes de chaque son et du bouton muet
+    pg.evaluate("localStorage.removeItem('micro-rider.vol-general')")
+    pg.fill("#volGeneral", "30"); pg.evaluate("document.querySelector('#volGeneral').dispatchEvent(new Event('input'))")
+    g = pg.evaluate("[MR.sons.general(), MR.sons.volume('jeux'), localStorage.getItem('micro-rider.vol-general')]")
+    check("volume général : 30 %, mémorisé, sans toucher au volume des jeux", abs(g[0] - 0.3) < 0.01 and g[1] == 0.7 or abs(g[1] - pg.evaluate("MR.sons.volume('jeux')")) < 1e-9 and abs(g[0] - 0.3) < 0.01 and g[2] == "0.3", g)
+    pg.reload(); pg.wait_for_timeout(800)
+    check("volume général : retrouvé au rechargement", pg.evaluate("document.querySelector('#volGeneral').value") == "30" and abs(pg.evaluate("MR.sons.general()") - 0.3) < 0.01)
     check("pas d'erreur JS", not errs, errs)
     b.close()
 print(f"\n{sum(res)}/{len(res)}")

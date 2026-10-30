@@ -55,13 +55,14 @@ function creer(opts) {
   const base = opts.base, memo = opts.memo || { lire: (c, d) => d, ecrire() {} }, log = opts.log || (() => {});
   const vol = {}; for (const n of NOMS_BUS) vol[n] = borner(Number(memo.lire("vol-" + n, "0.7")), 0, 1);
   let muet = memo.lire("muet", "0") === "1";
+  let general = borner(Number(memo.lire("vol-general", "1")), 0, 1);        // volume général : sur tous les sons de l'application (ni sur la vidéo ni sur le reste de l'ordinateur)
   let ctx = null, maitre = null, tampons = {}, chargement = null, echec = false;
   const bus = {}, couches = {};                        // bus[n] : volume utilisateur ; couches : gain automatique pédalage / roue libre
   const st = { mode: "silence", pedale: null, rl: null, pos: 0, taux: 1 };
 
   function construire() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    maitre = ctx.createGain(); maitre.gain.value = muet ? 0 : 1; maitre.connect(ctx.destination);
+    maitre = ctx.createGain(); maitre.gain.value = muet ? 0 : general; maitre.connect(ctx.destination);
     for (const n of NOMS_BUS) { bus[n] = ctx.createGain(); bus[n].gain.value = vol[n] * NIVEAU[n]; bus[n].connect(maitre); }
     for (const n of ["pedalage", "rouelibre"]) { couches[n] = ctx.createGain(); couches[n].gain.value = 0; couches[n].connect(bus[n]); }
   }
@@ -156,9 +157,10 @@ function creer(opts) {
   };
   function effet(nom) { if (!ctx || ctx.state !== "running" || !EFFETS[nom]) return false; try { EFFETS[nom](); return true; } catch (e) { return false; } }
   function fixerVolume(nom, v) { vol[nom] = borner(v, 0, 1); memo.ecrire("vol-" + nom, String(vol[nom])); if (ctx) rampe(bus[nom].gain, vol[nom] * NIVEAU[nom], 0.05); }
-  function fixerMuet(m) { muet = !!m; memo.ecrire("muet", muet ? "1" : "0"); if (ctx) rampe(maitre.gain, muet ? 0 : 1, 0.05); }
+  function fixerMuet(m) { muet = !!m; memo.ecrire("muet", muet ? "1" : "0"); if (ctx) rampe(maitre.gain, muet ? 0 : general, 0.05); }
+  function fixerGeneral(v) { general = borner(v, 0, 1); memo.ecrire("vol-general", String(general)); if (ctx) rampe(maitre.gain, muet ? 0 : general, 0.05); }
 
-  return { activer, maj, jouer, effet, effets: () => Object.keys(EFFETS), pauseVoiture, fixerVolume, fixerMuet, volume: (n) => vol[n], muet: () => muet,
+  return { activer, maj, jouer, effet, effets: () => Object.keys(EFFETS), pauseVoiture, fixerVolume, fixerMuet, fixerGeneral, general: () => general, volume: (n) => vol[n], muet: () => muet,
            etat: () => ({ pret: !!tampons.pedalage, echec, contexte: ctx ? ctx.state : null, mode: st.mode, taux: st.taux, pos: st.pos, volumes: Object.assign({}, vol), muet }),
            attendre: () => chargement };
 }

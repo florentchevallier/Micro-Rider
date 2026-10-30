@@ -58,12 +58,15 @@ function chargerDef(def) {
 }
 function remplirSeances(selection) {
   const sel = $("seance"); sel.innerHTML = '<option value="">No workout (free ride)</option>';
-  let groupe = null;
+  let groupe = null, groupeGh = null;
   for (const id in defs) {
     const o = document.createElement("option"); o.value = id; o.textContent = defs[id].nom;
     if (id.startsWith("dossier:")) {
       if (!groupe) { groupe = document.createElement("optgroup"); groupe.label = "Folder: " + (dossierH ? dossierH.name : ""); sel.append(groupe); }
       groupe.append(o);
+    } else if (id.startsWith("github:")) {
+      if (!groupeGh) { groupeGh = document.createElement("optgroup"); groupeGh.label = "Zwift workouts (GitHub: " + GITHUB.repo + ")"; sel.append(groupeGh); }
+      groupeGh.append(o);
     } else sel.append(o);
   }
   sel.value = selection || "";
@@ -82,6 +85,49 @@ async function lireDefDossier(id) {
     defs[id] = Object.assign({}, Seances.lireFichier(f.name, await f.text()), { nom: d.nom });
     return true;
   } catch (err) { info("⚠ " + d.nom + " : " + err.message); log("⚠ folder, " + d.nom + " : " + err.message); return false; }
+}
+// ---------------- séances .zwo d'un dépôt GitHub public ----------------
+// Liste = un appel à l'API GitHub (arbre du dépôt, gardé en mémoire du navigateur) ; chaque fichier n'est téléchargé qu'au moment où on le choisit.
+const GITHUB = { repo: "bdcheung/zwift_workouts", branches: ["master", "main"] };
+function definirSeancesGithub(chemins, branche) {
+  for (const id of Object.keys(defs)) if (id.startsWith("github:")) delete defs[id];
+  for (const chemin of chemins) {
+    const url = "https://raw.githubusercontent.com/" + GITHUB.repo + "/" + branche + "/" + chemin.split("/").map(encodeURIComponent).join("/");
+    const nom = chemin.replace(/\.zwo$/i, "");
+    defs["github:" + chemin] = { nom, paresseux: { getFile: async () => {
+      const r = await fetch(url); if (!r.ok) throw new Error("download failed (HTTP " + r.status + ")");
+      const texte = await r.text(); return { name: chemin.split("/").pop(), text: async () => texte };
+    } } };
+  }
+}
+async function listerGithub() {
+  const b = $("bGithub"); b.disabled = true; b.textContent = "Loading…";
+  try {
+    let arbre = null, branche = null;
+    for (const br of GITHUB.branches) {
+      const r = await fetch("https://api.github.com/repos/" + GITHUB.repo + "/git/trees/" + br + "?recursive=1");
+      if (r.ok) { arbre = await r.json(); branche = br; break; }
+      if (r.status === 403 || r.status === 429) throw new Error("GitHub rate limit reached, try again in a few minutes");
+    }
+    if (!arbre) throw new Error("repository not found");
+    const chemins = arbre.tree.filter((e) => e.type === "blob" && /\.zwo$/i.test(e.path)).map((e) => e.path).sort((a, c) => a.localeCompare(c, "en", { sensitivity: "base" }));
+    if (!chemins.length) throw new Error("no .zwo file in the repository");
+    try { localStorage.setItem("micro-rider.github", JSON.stringify({ branche, chemins })); } catch (e) { /* stockage indisponible */ }
+    const courant = $("seance").value || memo.lire("seance", "");
+    definirSeancesGithub(chemins, branche); remplirSeances(defs[courant] ? courant : "");
+    log("GitHub workouts: " + chemins.length + " .zwo file(s) from " + GITHUB.repo + ".");
+    info(chemins.length + " Zwift workouts added to the workout list (group “GitHub”). Each one downloads when you pick it.");
+    majBoutonGithub(chemins.length);
+  } catch (e) { info("⚠ GitHub workouts: " + e.message); log("⚠ GitHub workouts: " + e.message); majBoutonGithub(); }
+  b.disabled = false;
+}
+function majBoutonGithub(n) { $("bGithub").textContent = n ? "↻ Zwift workouts (" + n + ")" : "Zwift workouts (GitHub)"; }
+$("bGithub").addEventListener("click", listerGithub);
+function restaurerGithub() {      // liste mémorisée par un clic précédent : disponible sans réseau jusqu'au choix d'une séance
+  try {
+    const m = JSON.parse(localStorage.getItem("micro-rider.github") || "null");
+    if (m && Array.isArray(m.chemins) && m.chemins.length) { definirSeancesGithub(m.chemins, m.branche || GITHUB.branches[0]); majBoutonGithub(m.chemins.length); }
+  } catch (e) { /* mémoire illisible : ignorée */ }
 }
 // ---------------- dossier de séances (Chrome / Edge) ----------------
 let dossierH = null;
@@ -556,7 +602,9 @@ function initSons() {
     $(id).value = String(Math.round(sons.volume(nom) * 100));
     $(id).addEventListener("input", (e) => sons.fixerVolume(nom, Number(e.target.value) / 100));
   }
-  const majMuet = () => { $("bMuet").textContent = sons.muet() ? "🔇" : "🔊"; $("bMuet").setAttribute("aria-pressed", String(sons.muet())); };
+  $("volGeneral").value = String(Math.round(sons.general() * 100));
+  $("volGeneral").addEventListener("input", (e) => sons.fixerGeneral(Number(e.target.value) / 100));
+  const majMuet = () => { $("volGeneral").style.opacity = sons.muet() ? "0.4" : ""; $("bMuet").textContent = sons.muet() ? "🔇" : "🔊"; $("bMuet").setAttribute("aria-pressed", String(sons.muet())); };
   $("bMuet").addEventListener("click", () => { sons.fixerMuet(!sons.muet()); majMuet(); }); majMuet();
   setInterval(() => { const S = valeurs(); sons.maj(0.1, { cadence: S.cadenceAnim, vitesseKmh: S.vitesseKmh }); }, 100);   // indépendant de l'affichage
 }
@@ -655,9 +703,13 @@ if (window.ResizeObserver) { const ro = new ResizeObserver(ajusterTaille); for (
 $("ftp").value = memo.lire("ftp", "250");
 $("fcmax").value = memo.lire("fcmax", "190");
 $("fcmax").addEventListener("change", () => memo.ecrire("fcmax", $("fcmax").value));
-remplirSeances(""); initModes();
+restaurerGithub(); remplirSeances(""); initModes();
 const idSeance = memo.lire("seance", "");
-if (idSeance && defs[idSeance]) { $("seance").value = idSeance; chargerDef(defs[idSeance]); }
+if (idSeance && defs[idSeance]) {
+  $("seance").value = idSeance;
+  if (defs[idSeance].paresseux) lireDefDossier(idSeance).then((ok) => { if (ok && !defCourante) chargerDef(defs[idSeance]); else if (!ok) $("seance").value = ""; });   // séance GitHub mémorisée : téléchargée au démarrage
+  else chargerDef(defs[idSeance]);
+}
 majBoutonsBle(); majBoutonClick(); majAppareils(); majTextes(); initDossier(); ajusterTaille();
 chargerMode("promenade"); ouvrirBorne(memo.lire("borne.ouverte", "0") === "1");
 requestAnimationFrame(dessiner);
