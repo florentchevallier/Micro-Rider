@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro-Rider · Chain Four</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#081530;color:#cfe2f7;font:14px system-ui,sans-serif}
+main{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px}
+.borne{position:relative;width:min(94vw,calc((100svh - 60px) * 2 / 3));aspect-ratio:1024/1536;user-select:none}
+.borne>canvas#pupitre{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.borne canvas#ecran{position:absolute;pointer-events:none;left:26.4%;top:18%;width:47.2%;height:38.1%;border-radius:3.5% / 2.8%;background:#06122b}
+.aide{max-width:560px;text-align:center;font-size:12px;color:#8ea6c8}
+</style>
+</head>
+<body>
+<main>
+  <div class="borne" id="borne">
+    <canvas id="pupitre" width="1024" height="1536" aria-label="Micro-Rider arcade cabinet: d-pad, A, B, Start, Select"></canvas>
+    <canvas id="ecran" aria-label="Chain Four: cabinet screen"></canvas>
+  </div>
+  <p class="aide">Keyboard: arrows = d-pad (← → choose, ↓ drops) · Enter / Space / X = A (drop) · Backspace / Z = B (undo) · Esc = Start (new game).<br>No time limit; your game is saved. (Add <code>?lang=fr</code> for French.)</p>
+</main>
+<script src="../art/bornes-jeux/console-portable/commandes/atlas.js"></script>
+<script src="../art/bornes-jeux/console-portable/commandes/correction-croix/mecanique.js"></script>
+<script src="../art/bornes-jeux/console-portable/dessin-commandes.js"></script>
+<script src="js/jeux/chain4.js"></script>
+<script src="js/jeux/chain4-ecran.js"></script>
+<script src="js/jeux/entrees.js"></script>
+<script src="js/jeux/pupitre.js"></script>
+<script>
+(function () {
+  const jeu = Chain4Ecran.creer(document.getElementById("ecran"), { langue: new URLSearchParams(location.search).get("lang") });
+  const entrees = Entrees.creer(document, (a) => jeu.action(a));
+  window.JEU = jeu;
+  window.PUPITRE = Pupitre.creer(document.getElementById("pupitre"), { modele: "classique", base: "../art/bornes-jeux/console-portable/", surAction: (a) => entrees.injecter(a) })
+    .catch((e) => { document.querySelector(".aide").textContent = e.message; });
+})();
+</script>
+</body>
+</html>

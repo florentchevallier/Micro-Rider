@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostic Bluetooth - jalon 2a</title>
+<style>
+  :root {
+    --bg: #12151c; --panel: #1b2030; --texte: #e8ecf4; --discret: #8b94a8;
+    --puissance: #ff9a3c; --cadence: #5ab4ff; --fc: #ff5d6c; --ok: #4ade80; --alerte: #facc15;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--texte);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 12px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 18px; margin: 0; }
+  h2 { font-size: 14px; margin: 0 0 8px; }
+  .carte { background: var(--panel); border-radius: 10px; padding: 10px 12px; }
+  .cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 10px; }
+  .ligne { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  button {
+    background: #242b42; color: var(--texte); border: 1px solid #2c3450; border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: #4a5680; }
+  button:disabled { opacity: .4; cursor: default; }
+  button.principal { border-color: var(--puissance); color: var(--puissance); }
+  label.petit, .petit { font-size: 12px; color: var(--discret); }
+  .etat { font-size: 13px; margin-bottom: 8px; min-height: 18px; }
+  .etat.ok { color: var(--ok); }
+  .tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 6px; margin-bottom: 6px; }
+  .tuile { background: var(--bg); border-radius: 8px; padding: 5px 8px; }
+  .tuile .lib { display: block; font-size: 10px; color: var(--discret); text-transform: uppercase; letter-spacing: .04em; }
+  .tuile .val { font-size: 22px; font-variant-numeric: tabular-nums; }
+  .tuile .val i { font-size: .5em; font-style: normal; color: var(--discret); margin-left: 3px; }
+  .tuile.p .val { color: var(--puissance); } .tuile.c .val { color: var(--cadence); } .tuile.f .val { color: var(--fc); }
+  pre { margin: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--discret); white-space: pre-wrap; word-break: break-all; }
+  #journal { max-height: 320px; overflow: auto; background: var(--bg); border-radius: 8px; padding: 8px; color: var(--texte); }
+  input[type=number] { width: 80px; background: var(--bg); color: var(--texte); border: 1px solid #2c3450; border-radius: 4px; padding: 4px 6px; }
+  input[type=range] { width: 220px; vertical-align: middle; }
+  .avert { border-left: 3px solid var(--alerte); padding-left: 8px; font-size: 12.5px; color: var(--discret); }
+  #compat { font-size: 13px; }
+  #compat.mauvais { color: var(--alerte); }
+</style>
+</head>
+<body>
+
+<h1>Diagnostic Bluetooth <span class="petit">(jalon 2a : lire ce que le trainer et le capteur cardio envoient)</span></h1>
+<div id="compat"></div>
+<div class="avert">Avant de commencer : ferme Zwift et toute autre appli connectée au trainer (téléphone, montre Garmin, etc.), car un trainer n'accepte qu'un nombre limité de connexions. Pédale un peu pour réveiller le Hub avant de te connecter.</div>
+
+<section class="cartes">
+  <article class="carte">
+    <h2>Trainer (Zwift Hub)</h2>
+    <div class="ligne">
+      <button id="bTrainer" class="principal">Connecter le trainer</button>
+      <button id="bTrainerOff" disabled>Déconnecter</button>
+      <label class="petit"><input type="checkbox" id="tousT"> afficher tous les appareils</label>
+    </div>
+    <div class="etat" id="eTrainer">non connecté</div>
+    <div class="tuiles">
+      <div class="tuile p"><span class="lib">Puissance</span><span class="val"><span id="tP">–</span><i>W</i></span></div>
+      <div class="tuile c"><span class="lib">Cadence</span><span class="val"><span id="tC">–</span><i>tr/min</i></span></div>
+      <div class="tuile"><span class="lib">Vitesse</span><span class="val"><span id="tV">–</span><i>km/h</i></span></div>
+      <div class="tuile"><span class="lib">Distance</span><span class="val"><span id="tD">–</span><i>m</i></span></div>
+      <div class="tuile"><span class="lib">Résistance</span><span class="val"><span id="tR">–</span></span></div>
+      <div class="tuile f"><span class="lib">FC relayée</span><span class="val"><span id="tF">–</span><i>bpm</i></span></div>
+    </div>
+    <div class="petit" id="detailTrainer">FTMS : – · Cycling Power : –</div>
+    <pre id="rawTrainer"></pre>
+  </article>
+
+  <article class="carte">
+    <h2>Capteur cardio (HW9 ou montre)</h2>
+    <div class="ligne">
+      <button id="bFc" class="principal">Connecter le capteur cardio</button>
+      <button id="bFcOff" disabled>Déconnecter</button>
+      <label class="petit"><input type="checkbox" id="tousF"> afficher tous les appareils</label>
+    </div>
+    <div class="etat" id="eFc">non connecté</div>
+    <div class="tuiles">
+      <div class="tuile f"><span class="lib">Fréq. cardiaque</span><span class="val"><span id="fVal">–</span><i>bpm</i></span></div>
+      <div class="tuile"><span class="lib">Contact</span><span class="val" style="font-size:14px"><span id="fContact">–</span></span></div>
+      <div class="tuile"><span class="lib">Intervalle RR</span><span class="val" style="font-size:16px"><span id="fRR">–</span><i>ms</i></span></div>
+      <div class="tuile"><span class="lib">Batterie</span><span class="val" style="font-size:16px"><span id="fBat">–</span><i>%</i></span></div>
+    </div>
+    <div class="petit" id="detailFc">–</div>
+    <pre id="rawFc"></pre>
+  </article>
+</section>
+
+<section class="carte">
+  <h2>Test de commande du trainer (optionnel)</h2>
+  <div class="petit" style="margin-bottom:8px">
+    Ne fait rien tant que tu ne cliques pas. Sert à vérifier que le Hub accepte les ordres du navigateur : « simulation de pente » (la résistance suit la pente) et « puissance cible » (mode ERG). Tu dois sentir la résistance changer. Pédale doucement pour ce test.
+  </div>
+  <div class="ligne">
+    <button id="bControle" disabled>1. Prendre le contrôle</button>
+    <button id="bStop" disabled>Arrêter la commande</button>
+  </div>
+  <div class="ligne">
+    <span class="petit" style="min-width:90px">2. Pente :</span>
+    <input type="range" id="sPente" min="-10" max="20" step="0.5" value="5" disabled>
+    <b id="vPente">5 %</b> <span class="petit">(la commande part quand tu relâches le curseur)</span>
+  </div>
+  <div class="ligne">
+    <span class="petit" style="min-width:90px">3. Puissance :</span>
+    <input type="number" id="nPuiss" min="50" max="300" step="10" value="100" disabled> W
+    <button id="bPuiss" disabled>Envoyer (ERG)</button>
+    <span class="petit">(50 à 300 W)</span>
+  </div>
+</section>
+
+<section class="carte">
+  <div class="ligne">
+    <h2 style="margin:0">Journal</h2>
+    <button id="bCopier">Copier le journal</button>
+    <span class="petit">Après tes essais, copie-le et colle-le dans la conversation.</span>
+  </div>
+  <pre id="journal"></pre>
+</section>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   PARTIE 1 - LES PARSEURS : transforment les octets reçus en valeurs.
+   Rien de Bluetooth ici (juste des octets), donc testable et réutilisable
+   tel quel dans le jeu.
+   ===================================================================== */
+// >>> PARSEURS
+
+// Un UUID Bluetooth court (ex. 0x2ad2) s'écrit en version longue standard :
+const canon = (n) => "0000" + n.toString(16).padStart(4, "0") + "-0000-1000-8000-00805f9b34fb";
+function uuidCourt(uuid) {
+  const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(uuid);
+  return m ? parseInt(m[1], 16) : null;
+}
+const hex = (dv) => Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength))
+  .map((b) => b.toString(16).padStart(2, "0")).join(" ");
+
+// Indoor Bike Data (FTMS, 0x2AD2). Le 1er champ (2 octets) dit quels champs suivent.
+// Piège de la norme : le bit 0 est INVERSÉ (vitesse présente quand il vaut 0).
+function parseIndoorBike(dv) {
+  let o = 0;
+  const flags = dv.getUint16(o, true); o += 2;
+  const r = {};
+  if (!(flags & 0x0001)) { r.vitesse = dv.getUint16(o, true) * 0.01; o += 2; }   // km/h
+  if (flags & 0x0002) { r.vitesseMoy = dv.getUint16(o, true) * 0.01; o += 2; }
+  if (flags & 0x0004) { r.cadence = dv.getUint16(o, true) * 0.5; o += 2; }       // tr/min
+  if (flags & 0x0008) { r.cadenceMoy = dv.getUint16(o, true) * 0.5; o += 2; }
+  if (flags & 0x0010) { r.distance = dv.getUint16(o, true) | (dv.getUint8(o + 2) << 16); o += 3; }  // m
+  if (flags & 0x0020) { r.resistance = dv.getInt16(o, true); o += 2; }
+  if (flags & 0x0040) { r.puissance = dv.getInt16(o, true); o += 2; }            // W
+  if (flags & 0x0080) { r.puissanceMoy = dv.getInt16(o, true); o += 2; }
+  if (flags & 0x0100) { r.energie = dv.getUint16(o, true); o += 5; }             // total, par heure, par minute
+  if (flags & 0x0200) { r.fc = dv.getUint8(o); o += 1; }
+  if (flags & 0x0400) { o += 1; }                                                // équivalent métabolique
+  if (flags & 0x0800) { r.temps = dv.getUint16(o, true); o += 2; }
+  if (flags & 0x1000) { o += 2; }
+  return r;
+}
+
+// Cycling Power Measurement (0x2A63) : puissance + éventuellement données de manivelle.
+function parseCyclingPower(dv) {
+  const flags = dv.getUint16(0, true);
+  let o = 2;
+  const r = { puissance: dv.getInt16(o, true) }; o += 2;
+  if (flags & 0x0001) o += 1;                       // équilibre gauche/droite
+  if (flags & 0x0004) o += 2;                       // couple cumulé
+  if (flags & 0x0010) o += 6;                       // données de roue
+  if (flags & 0x0020) {                             // données de manivelle
+    r.tours = dv.getUint16(o, true);                // tours cumulés
+    r.temps = dv.getUint16(o + 2, true);            // heure du dernier tour, en 1/1024 s
+    o += 4;
+  }
+  return r;
+}
+// Cadence = tours gagnés / temps écoulé entre deux paquets (compteurs sur 16 bits qui bouclent).
+function cadenceManivelle(prec, cur) {
+  if (!prec || cur.tours === undefined || prec.tours === undefined) return undefined;
+  const dTours = (cur.tours - prec.tours + 65536) % 65536;
+  const dTemps = (cur.temps - prec.temps + 65536) % 65536;
+  if (dTemps === 0) return undefined;               // pas de nouveau tour : on garde l'ancienne valeur
+  return dTours / (dTemps / 1024) * 60;
+}
+
+// Heart Rate Measurement (0x2A37).
+function parseHR(dv) {
+  const f = dv.getUint8(0);
+  let o = 1;
+  const r = {};
+  if (f & 0x01) { r.fc = dv.getUint16(o, true); o += 2; } else { r.fc = dv.getUint8(o); o += 1; }
+  const contact = (f >> 1) & 3;                     // 2 = pas de contact, 3 = contact, sinon non indiqué
+  r.contact = contact === 3 ? "OK" : contact === 2 ? "perdu" : "n/a";
+  if (f & 0x08) o += 2;                             // énergie dépensée
+  if (f & 0x10) {                                   // intervalles RR (1/1024 s -> ms)
+    r.rr = [];
+    while (o + 1 < dv.byteLength) { r.rr.push(Math.round(dv.getUint16(o, true) / 1024 * 1000)); o += 2; }
+  }
+  return r;
+}
+
+// Commandes du Control Point FTMS (0x2AD9) : on fabrique les octets à envoyer.
+const octetsSimulation = (pentePct) => {          // opcode 0x11 : vent, pente, roulement, aéro
+  const b = new Uint8Array(7), dv = new DataView(b.buffer);
+  dv.setUint8(0, 0x11);
+  dv.setInt16(1, 0, true);                        // vent : 0
+  dv.setInt16(3, Math.round(pentePct * 100), true); // pente en 0,01 %
+  dv.setUint8(5, 50);                             // coefficient de roulement 0,0050 (comme notre physique)
+  dv.setUint8(6, 19);                             // coefficient d'air 0,19 kg/m (CdA 0,32, rho 1,2)
+  return Array.from(b);
+};
+const octetsPuissance = (w) => [0x05, w & 0xff, (w >> 8) & 0xff];   // opcode 0x05 : puissance cible
+const OCTETS_CONTROLE = [0x00], OCTETS_DEMARRAGE = [0x07], OCTETS_STOP = [0x08, 0x01];
+const RESULTATS = { 1: "succès", 2: "non supporté", 3: "paramètre invalide", 4: "échec", 5: "non autorisé" };
+// <<< PARSEURS
+
+/* =====================================================================
+   PARTIE 2 - LE BLUETOOTH : connexion, abonnements, commandes.
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const fmt = (n, dec = 0) => (n === undefined || n === null || Number.isNaN(n)) ? "–" : n.toFixed(dec).replace(".", ",");
+
+const NOMS = {
+  0x1826: "Fitness Machine (FTMS)", 0x1818: "Cycling Power", 0x180d: "Heart Rate", 0x180f: "Battery", 0x180a: "Device Information",
+  0x2acc: "FTMS Feature", 0x2ad2: "Indoor Bike Data", 0x2ad9: "FTMS Control Point", 0x2ada: "FTMS Status",
+  0x2ad3: "Training Status", 0x2ad6: "Supported Resistance Range", 0x2ad8: "Supported Power Range",
+  0x2a63: "Cycling Power Measurement", 0x2a65: "Cycling Power Feature", 0x2a5d: "Sensor Location",
+  0x2a37: "Heart Rate Measurement", 0x2a38: "Body Sensor Location", 0x2a39: "HR Control Point",
+  0x2a19: "Battery Level", 0x2a29: "Manufacturer Name", 0x2a24: "Model Number", 0x2a26: "Firmware Revision"
+};
+function nomUuid(uuid) {
+  const c = uuidCourt(uuid);
+  return c !== null ? "0x" + c.toString(16) + " " + (NOMS[c] || "(autre)") : uuid;
+}
+
+// --- Journal
+const lignes = [];
+function log(msg) {
+  const t = new Date();
+  lignes.push(t.toLocaleTimeString("fr-FR") + "." + String(t.getMilliseconds()).padStart(3, "0") + "  " + msg);
+  if (lignes.length > 500) lignes.shift();
+  const j = $("journal"); j.textContent = lignes.join("\n"); j.scrollTop = j.scrollHeight;
+}
+$("bCopier").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lignes.join("\n")); log("Journal copié dans le presse-papiers."); }
+  catch (e) { log("Copie automatique impossible : sélectionne le texte du journal à la main."); }
+});
+
+// --- Compatibilité
+if (!navigator.bluetooth) {
+  $("compat").className = "mauvais";
+  $("compat").textContent = "⚠ Web Bluetooth n'est pas disponible ici. Utilise Chrome (ou Edge) ; Safari et Firefox ne le gèrent pas. " +
+    "Page sécurisée : " + (window.isSecureContext ? "oui" : "non (ouvre la page via http://localhost, voir les consignes)") + ".";
+  ["bTrainer", "bFc"].forEach((id) => { $(id).disabled = true; });
+} else {
+  $("compat").textContent = "Web Bluetooth disponible.";
+}
+
+const decrire = (c) => ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter((k) => c.properties[k]).join(", ");
+const erreur = (qui, e) => {
+  if (e && e.name === "NotFoundError") { log(qui + " : aucun appareil choisi (fenêtre fermée ou rien trouvé)."); return; }
+  log("⚠ " + qui + " : " + (e && e.name) + " – " + (e && e.message));
+  log("   Pistes : appareil déjà connecté ailleurs (Zwift, téléphone, montre) ? Bluetooth autorisé pour Chrome dans Réglages Système > Confidentialité ?");
+};
+async function abonner(c, nom, traiter) {
+  try {
+    c.addEventListener("characteristicvaluechanged", (e) => traiter(e.target.value));
+    await c.startNotifications();
+    log("Abonné à " + nom + ".");
+  } catch (e) { log("⚠ abonnement à " + nom + " impossible : " + e.name + " – " + e.message); }
+}
+// Liste services et caractéristiques d'un appareil et renvoie un dictionnaire uuid -> caractéristique.
+async function inventaire(server) {
+  const parUuid = {};
+  const services = await server.getPrimaryServices();
+  for (const s of services) {
+    log("Service " + nomUuid(s.uuid));
+    let chars = [];
+    try { chars = await s.getCharacteristics(); } catch (e) { log("   ⚠ caractéristiques illisibles : " + e.message); }
+    for (const c of chars) { log("   " + nomUuid(c.uuid) + "  [" + decrire(c) + "]"); parUuid[c.uuid] = c; }
+  }
+  if (!services.length) log("⚠ aucun service accessible.");
+  return parUuid;
+}
+async function lireBatterie(parUuid) {
+  const c = parUuid[canon(0x2a19)];
+  if (!c) return undefined;
+  try { return (await c.readValue()).getUint8(0); } catch (e) { return undefined; }
+}
+
+// Compteur de paquets par seconde, par source.
+const compte = { ftms: 0, power: 0, fc: 0 };   // paquets reçus depuis la dernière seconde
+const hz = { ftms: 0, power: 0, fc: 0 };       // dernière mesure, affichée
+let tic = 0;
+setInterval(() => {
+  hz.ftms = compte.ftms; hz.power = compte.power; hz.fc = compte.fc;
+  compte.ftms = compte.power = compte.fc = 0;
+  majTrainer(); majFc();
+  // Toutes les 5 s, une ligne de valeurs dans le journal (pour garder une trace de ce qui est arrivé)
+  if (++tic % 5 === 0 && (hz.ftms || hz.power || hz.fc)) {
+    const f = T.ftms || {}, p = T.power || {}, h = F.hr || {};
+    log("Valeurs : FTMS " + fmt(f.puissance) + " W, " + fmt(f.cadence) + " tr/min, " + fmt(f.vitesse, 1) + " km/h, " + fmt(f.distance) + " m" +
+        " | Power " + fmt(p.puissance) + " W, cad. " + fmt(T.cadPower) +
+        " | FC " + fmt(h.fc) + " (" + hz.ftms + "/" + hz.power + "/" + hz.fc + " paquets/s)");
+  }
+}, 1000);
+
+// ============================ TRAINER ============================
+const T = { device: null, cp: null, controle: false, attente: null, ftms: null, power: null, cadPower: undefined, precPower: null, bruts: {}, vu: {} };
+
+async function connecterTrainer() {
+  try {
+    const optionnels = [0x1826, 0x1818, 0x180f, 0x180a];
+    const opts = $("tousT").checked
+      ? { acceptAllDevices: true, optionalServices: optionnels }
+      : { filters: [{ services: [0x1826] }, { services: [0x1818] }], optionalServices: optionnels };
+    log("Recherche du trainer…");
+    const device = await navigator.bluetooth.requestDevice(opts);
+    await ouvrirTrainer(device);
+  } catch (e) { erreur("Trainer", e); }
+}
+
+async function ouvrirTrainer(device) {
+  T.device = device; T.controle = false; T.cp = null; T.ftms = null; T.power = null; T.precPower = null; T.cadPower = undefined; T.vu = {};
+  setEtat("eTrainer", "connexion à " + (device.name || "(sans nom)") + "…", false);
+  device.addEventListener("gattserverdisconnected", () => {
+    log("Trainer déconnecté.");
+    T.controle = false; T.cp = null;
+    setEtat("eTrainer", "déconnecté", false); majBoutons();
+  });
+  const server = await device.gatt.connect();
+  log("Trainer connecté : " + (device.name || "(sans nom)"));
+  setEtat("eTrainer", "connecté : " + (device.name || "(sans nom)"), true);
+  const c = await inventaire(server);
+
+  // Fonctions annoncées par le trainer (FTMS Feature)
+  const feat = c[canon(0x2acc)];
+  if (feat) {
+    try {
+      const dv = await feat.readValue();
+      log("FTMS Feature : " + hex(dv));
+      const cible = dv.getUint32(4, true);
+      log("   commandes supportées : puissance cible " + (cible & (1 << 3) ? "oui" : "non") +
+          ", simulation de pente " + (cible & (1 << 13) ? "oui" : "non") +
+          ", résistance cible " + (cible & (1 << 2) ? "oui" : "non"));
+    } catch (e) { log("⚠ lecture FTMS Feature : " + e.message); }
+  }
+  // Plages que le trainer accepte : puissance cible (W) et résistance (unité 0,1)
+  for (const [num, nom, unite] of [[0x2ad8, "puissance", "W"], [0x2ad6, "résistance", "(×0,1)"]]) {
+    const car = c[canon(num)];
+    if (!car) continue;
+    try {
+      const dv = await car.readValue();
+      log("Plage de " + nom + " : " + dv.getInt16(0, true) + " à " + dv.getInt16(2, true) + " " + unite +
+          ", pas " + dv.getUint16(4, true) + "  [" + hex(dv) + "]");
+    } catch (e) { log("⚠ lecture plage de " + nom + " : " + e.message); }
+  }
+  if (c[canon(0x2ad2)]) await abonner(c[canon(0x2ad2)], "Indoor Bike Data", (dv) => {
+    compte.ftms++; T.bruts.ftms = hex(dv);
+    try {
+      T.ftms = parseIndoorBike(dv);
+      if (!T.vu.ftms) { T.vu.ftms = true; log("1er paquet FTMS : " + hex(dv) + " → " + JSON.stringify(T.ftms)); }
+    } catch (e) { log("⚠ paquet FTMS illisible : " + hex(dv)); }
+    majTrainer();
+  });
+  if (c[canon(0x2a63)]) await abonner(c[canon(0x2a63)], "Cycling Power Measurement", (dv) => {
+    compte.power++; T.bruts.power = hex(dv);
+    try {
+      const r = parseCyclingPower(dv);
+      const cad = cadenceManivelle(T.precPower, r);
+      if (cad !== undefined) T.cadPower = cad;
+      T.precPower = r; T.power = r;
+      if (!T.vu.power) { T.vu.power = true; log("1er paquet Cycling Power : " + hex(dv) + " → " + JSON.stringify(r)); }
+    } catch (e) { log("⚠ paquet Cycling Power illisible : " + hex(dv)); }
+    majTrainer();
+  });
+  if (c[canon(0x2ada)]) await abonner(c[canon(0x2ada)], "FTMS Status", (dv) => log("Status FTMS : " + hex(dv)));
+  if (c[canon(0x2ad9)]) {
+    T.cp = c[canon(0x2ad9)];
+    await abonner(T.cp, "Control Point", reponseControle);
+  } else log("Pas de Control Point : le trainer ne peut pas être commandé par cette voie.");
+  const bat = await lireBatterie(c);
+  if (bat !== undefined) log("Batterie du trainer : " + bat + " %");
+  majBoutons();
+  log("Prêt. Pédale pour voir les valeurs.");
+}
+
+function majTrainer() {
+  const f = T.ftms || {}, p = T.power || {};
+  const puiss = f.puissance !== undefined ? f.puissance : p.puissance;
+  const cad = f.cadence !== undefined ? f.cadence : T.cadPower;
+  $("tP").textContent = fmt(puiss);
+  $("tC").textContent = fmt(cad);
+  $("tV").textContent = fmt(f.vitesse, 1);
+  $("tD").textContent = fmt(f.distance);
+  $("tR").textContent = fmt(f.resistance);
+  $("tF").textContent = fmt(f.fc);
+  $("detailTrainer").textContent =
+    "FTMS : " + (T.ftms ? fmt(f.puissance) + " W, " + fmt(f.cadence) + " tr/min, " + hz.ftms + " paquet/s" : "–") +
+    " · Cycling Power : " + (T.power ? fmt(p.puissance) + " W, cadence " + fmt(T.cadPower) + ", " + hz.power + " paquet/s" : "–");
+  $("rawTrainer").textContent = (T.bruts.ftms ? "FTMS  " + T.bruts.ftms : "") + (T.bruts.power ? "\nPower " + T.bruts.power : "");
+}
+
+// --- Commandes
+function reponseControle(dv) {
+  log("← Control Point : " + hex(dv));
+  const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  if (b[0] === 0x80) {
+    log("   réponse à l'opcode 0x" + b[1].toString(16) + " : " + (RESULTATS[b[2]] || "code " + b[2]));
+    if (T.attente && T.attente.op === b[1]) { clearTimeout(T.attente.t); const r = T.attente.resolve; T.attente = null; r(b[2]); }
+  }
+}
+async function commande(nom, octets) {
+  if (!T.cp) { log("⚠ pas de Control Point."); return null; }
+  const data = Uint8Array.from(octets);
+  log("→ " + nom + " : " + hex(new DataView(data.buffer)));
+  const attendre = new Promise((resolve) => {
+    T.attente = { op: octets[0], resolve, t: setTimeout(() => { log("⚠ pas de réponse à « " + nom + " » (3 s)"); T.attente = null; resolve(null); }, 3000) };
+  });
+  try {
+    if (T.cp.writeValueWithResponse) await T.cp.writeValueWithResponse(data); else await T.cp.writeValue(data);
+  } catch (e) {
+    if (T.attente) { clearTimeout(T.attente.t); T.attente = null; }
+    log("⚠ écriture « " + nom + " » impossible : " + e.name + " – " + e.message);
+    return null;
+  }
+  return attendre;
+}
+async function prendreControle() {
+  const r = await commande("Request Control", OCTETS_CONTROLE);
+  if (r === 1) {
+    T.controle = true;
+    await commande("Start or Resume", OCTETS_DEMARRAGE);
+    log("Contrôle obtenu : tu peux essayer la pente ou la puissance cible.");
+  } else log("Contrôle non obtenu (voir la réponse ci-dessus).");
+  majBoutons();
+}
+async function envoyerPente() {
+  const p = Number($("sPente").value);
+  await commande("Simulation de pente " + p + " %", octetsSimulation(p));
+}
+async function envoyerPuissance() {
+  const w = Math.max(50, Math.min(300, Math.round(Number($("nPuiss").value) || 100)));
+  $("nPuiss").value = w;
+  await commande("Puissance cible " + w + " W", octetsPuissance(w));
+}
+async function arreter() {
+  await commande("Stop", OCTETS_STOP);
+  T.controle = false; majBoutons();
+}
+
+// ============================ CARDIO ============================
+const F = { device: null, hr: null, bat: undefined, vu: false };
+
+async function connecterFc() {
+  try {
+    const optionnels = [0x180d, 0x180f, 0x180a];
+    const opts = $("tousF").checked
+      ? { acceptAllDevices: true, optionalServices: optionnels }
+      // Le Zwift Hub expose lui aussi un service cardio : on l'écarte de la liste pour ne pas le confondre avec le capteur.
+      : { filters: [{ services: [0x180d] }], exclusionFilters: [{ namePrefix: "Zwift" }, { namePrefix: "ZWIFT" }], optionalServices: optionnels };
+    log("Recherche du capteur cardio…");
+    const device = await navigator.bluetooth.requestDevice(opts);
+    if (T.device && device.name && device.name === T.device.name) log("⚠ Cet appareil porte le même nom que le trainer : ce n'est sans doute pas le capteur cardio.");
+    F.device = device; F.hr = null; F.vu = false;
+    setEtat("eFc", "connexion à " + (device.name || "(sans nom)") + "…", false);
+    device.addEventListener("gattserverdisconnected", () => { log("Capteur cardio déconnecté."); setEtat("eFc", "déconnecté", false); majBoutons(); });
+    const server = await device.gatt.connect();
+    log("Capteur cardio connecté : " + (device.name || "(sans nom)"));
+    setEtat("eFc", "connecté : " + (device.name || "(sans nom)"), true);
+    const c = await inventaire(server);
+    F.bat = await lireBatterie(c);
+    if (c[canon(0x2a37)]) {
+      await abonner(c[canon(0x2a37)], "Heart Rate Measurement", (dv) => {
+        compte.fc++; $("rawFc").textContent = "HR  " + hex(dv);
+        try {
+          F.hr = parseHR(dv);
+          if (!F.vu) { F.vu = true; log("1er paquet cardio : " + hex(dv) + " → " + JSON.stringify(F.hr)); }
+        } catch (e) { log("⚠ paquet cardio illisible : " + hex(dv)); }
+        majFc();
+      });
+    } else log("⚠ ce n'est pas un capteur cardio standard (pas de 0x2a37).");
+    majBoutons();
+  } catch (e) { erreur("Capteur cardio", e); }
+}
+function majFc() {
+  const h = F.hr || {};
+  $("fVal").textContent = fmt(h.fc);
+  $("fContact").textContent = h.contact || "–";
+  $("fRR").textContent = h.rr && h.rr.length ? h.rr.join(" ") : "–";
+  $("fBat").textContent = fmt(F.bat);
+  $("detailFc").textContent = F.hr ? hz.fc + " paquet/s" : "–";
+}
+
+// ============================ INTERFACE ============================
+function setEtat(id, texte, ok) { const e = $(id); e.textContent = texte; e.className = "etat" + (ok ? " ok" : ""); }
+function majBoutons() {
+  const tOk = !!(T.device && T.device.gatt && T.device.gatt.connected);
+  const fOk = !!(F.device && F.device.gatt && F.device.gatt.connected);
+  $("bTrainerOff").disabled = !tOk; $("bFcOff").disabled = !fOk;
+  $("bControle").disabled = !(tOk && T.cp);
+  $("bStop").disabled = !(tOk && T.controle);
+  $("sPente").disabled = !(tOk && T.controle);
+  $("nPuiss").disabled = !(tOk && T.controle);
+  $("bPuiss").disabled = !(tOk && T.controle);
+}
+$("bTrainer").addEventListener("click", connecterTrainer);
+$("bFc").addEventListener("click", connecterFc);
+$("bTrainerOff").addEventListener("click", () => { if (T.device && T.device.gatt.connected) T.device.gatt.disconnect(); });
+$("bFcOff").addEventListener("click", () => { if (F.device && F.device.gatt.connected) F.device.gatt.disconnect(); });
+$("bControle").addEventListener("click", prendreControle);
+$("bStop").addEventListener("click", arreter);
+$("bPuiss").addEventListener("click", envoyerPuissance);
+$("sPente").addEventListener("input", () => { $("vPente").textContent = fmt(Number($("sPente").value), 1).replace(",0", "") + " %"; });
+$("sPente").addEventListener("change", envoyerPente);
+log("Page prête.");
+</script>
+</body>
+</html>

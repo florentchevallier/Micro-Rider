@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostic Bluetooth · Zwift Click</title>
+<style>
+  :root { --bg:#12151c; --panel:#1b2030; --texte:#e8ecf4; --discret:#8b94a8; --ok:#4ade80; --alerte:#facc15; --accent:#ff9a3c; }
+  * { box-sizing: border-box; }
+  body { margin:0 auto; padding:12px; max-width:1000px; background:var(--bg); color:var(--texte); font:14px system-ui,-apple-system,"Segoe UI",sans-serif; display:flex; flex-direction:column; gap:10px; }
+  h1 { font-size:18px; margin:0; } h2 { font-size:14px; margin:0 0 8px; }
+  .carte { background:var(--panel); border-radius:10px; padding:10px 12px; }
+  .ligne { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+  button { background:#242b42; color:var(--texte); border:1px solid #2c3450; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:#4a5680; } button:disabled { opacity:.4; cursor:default; }
+  button.principal { border-color:var(--accent); color:var(--accent); }
+  .petit { font-size:12px; color:var(--discret); line-height:1.5; }
+  .etat { font-size:13px; } .etat.ok { color:var(--ok); }
+  pre { margin:6px 0 0; background:#0d1017; border-radius:6px; padding:8px; font:11px/1.45 ui-monospace,Menlo,monospace; white-space:pre-wrap; word-break:break-all; max-height:360px; overflow:auto; }
+  ol { margin:6px 0 0; padding-left:20px; line-height:1.6; }
+  .bandeau { background:#2a2411; border:1px solid #5c4d12; color:#f0dc8a; border-radius:8px; padding:8px 12px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>Diagnostic Bluetooth · Zwift Click</h1>
+<div class="bandeau" id="compat">Ce test sert à savoir si Chrome peut se connecter au Zwift Click et lire ses boutons. Il ne commande rien sur le Hub.</div>
+
+<section class="carte">
+  <h2>Étapes</h2>
+  <ol class="petit">
+    <li>Libère le Click : ferme Zwift et Zwift Companion sur le téléphone ou l'ordinateur (il peut n'accepter qu'une connexion à la fois). Réveille-le en appuyant sur un bouton.</li>
+    <li>Clique sur « Connecter », choisis le Click dans la liste (il peut s'appeler « Zwift Click », ou seulement un code comme B381…).</li>
+    <li>Regarde le journal : services et caractéristiques vus, puis réception des paquets. Appuie sur chaque bouton (+, −), maintiens-le, relâche-le, et copie le journal.</li>
+    <li>S'il n'arrive rien, utilise « Envoyer l'échange de départ » (6 octets « RideOn ») puis appuie de nouveau sur les boutons.</li>
+  </ol>
+</section>
+
+<section class="carte">
+  <h2>Connexion</h2>
+  <div class="ligne">
+    <button id="bConnecter" class="principal">Connecter</button>
+    <button id="bDeconnecter" disabled>Déconnecter</button>
+    <button id="bRideOn" disabled title="Écrit les octets 52 69 64 65 4F 6E sur la caractéristique choisie">Envoyer l'échange de départ (RideOn)</button>
+    <label class="petit">Écrire sur : <select id="cible" disabled></select></label>
+  </div>
+  <div class="etat" id="etat">non connecté</div>
+  <div class="petit" id="resume">–</div>
+</section>
+
+<section class="carte">
+  <div class="ligne" style="justify-content:space-between"><h2 style="margin:0">Journal</h2><button id="bCopier">Copier le journal</button></div>
+  <pre id="journal"></pre>
+</section>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const canon = (n) => "0000" + n.toString(16).padStart(4, "0") + "-0000-1000-8000-00805f9b34fb";
+const hex = (dv) => Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+const RIDEON = [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e];       // « RideOn » en ASCII
+
+// Services que Chrome nous laisse voir : il faut les nommer à l'avance. Le premier (128 bits) est celui des
+// manettes Zwift Play/Click d'après des projets non officiels ; 0xFC82 est supposé pour des modèles plus récents.
+// Ces deux UUID ne sont PAS vérifiés pour ton modèle : si rien n'apparaît, c'est la première chose à regarder.
+const ZWIFT_128 = "00000001-19ca-4651-86e5-fa29dcdd09d1";
+const SERVICES = [ZWIFT_128, 0xfc82, 0x180f, 0x180a];
+const NOMS = { 0x180f: "Battery", 0x180a: "Device Information", 0xfc82: "(supposé Zwift, modèles récents)", 0x2a19: "Battery Level",
+  0x2a29: "Manufacturer Name", 0x2a24: "Model Number", 0x2a25: "Serial Number", 0x2a26: "Firmware Revision", 0x2a27: "Hardware Revision", 0x2a28: "Software Revision" };
+const court = (uuid) => { const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(uuid); return m ? parseInt(m[1], 16) : null; };
+const nom = (uuid) => { const c = court(uuid); return c !== null ? "0x" + c.toString(16) + (NOMS[c] ? " " + NOMS[c] : "") : uuid + (uuid === ZWIFT_128 ? "  (service Zwift supposé)" : ""); };
+const decrire = (c) => ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter((k) => c.properties[k]).join(", ");
+
+const lignes = [];
+function log(m) {
+  const t = new Date();
+  lignes.push(t.toLocaleTimeString("fr-FR") + "." + String(t.getMilliseconds()).padStart(3, "0") + "  " + m);
+  if (lignes.length > 1500) lignes.shift();
+  const j = $("journal"); j.textContent = lignes.join("\n"); j.scrollTop = j.scrollHeight;
+}
+$("bCopier").onclick = async () => {
+  try { await navigator.clipboard.writeText(lignes.join("\n")); log("Journal copié dans le presse-papiers."); }
+  catch (e) { log("Copie automatique impossible : sélectionne le texte du journal à la main."); }
+};
+function setEtat(t, ok) { $("etat").textContent = t; $("etat").className = "etat" + (ok ? " ok" : ""); }
+
+let appareil = null, ecrivables = {}, compte = {}, precedent = {};
+async function lireTexte(c) { try { const dv = await c.readValue(); return new TextDecoder().decode(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)); } catch (e) { return null; } }
+
+async function connecter() {
+  $("bConnecter").disabled = true; setEtat("recherche…", false);
+  try {
+    // Tous les appareils : l'utilisateur choisit dans la liste de Chrome (le nom du Click n'est pas garanti).
+    appareil = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
+    appareil.addEventListener("gattserverdisconnected", () => { log("Appareil déconnecté."); setEtat("déconnecté", false); majBoutons(false); });
+    log("Appareil choisi : " + (appareil.name || "(sans nom)") + "  id=" + appareil.id.slice(0, 8) + "…");
+    setEtat("connexion…", false);
+    const serveur = await appareil.gatt.connect();
+    log("Connecté.");
+    const services = await serveur.getPrimaryServices();
+    if (!services.length) log("⚠ aucun service visible. Soit l'UUID du service du Click n'est pas celui que j'ai supposé (Chrome cache les services non nommés à l'avance), soit l'appareil est déjà pris par une autre appli.");
+    ecrivables = {}; compte = {}; precedent = {};
+    $("cible").innerHTML = "";
+    const infos = [];
+    for (const s of services) {
+      log("Service " + nom(s.uuid));
+      let chars = []; try { chars = await s.getCharacteristics(); } catch (e) { log("   ⚠ caractéristiques illisibles : " + e.message); }
+      for (const c of chars) {
+        log("   " + nom(c.uuid) + "  [" + decrire(c) + "]");
+        const cc = court(c.uuid);
+        if (c.properties.read && cc !== null && (cc === 0x2a19 || (cc >= 0x2a24 && cc <= 0x2a29))) {
+          if (cc === 0x2a19) { try { const dv = await c.readValue(); log("      = " + dv.getUint8(0) + " %"); infos.push("batterie " + dv.getUint8(0) + " %"); } catch (e) { log("      lecture impossible : " + e.message); } }
+          else { const t = await lireTexte(c); log("      = " + t); if (t) infos.push((NOMS[cc] || cc.toString(16)) + " : " + t); }
+        }
+        if (c.properties.write || c.properties.writeWithoutResponse) {
+          ecrivables[c.uuid] = c; const o = document.createElement("option"); o.value = c.uuid; o.textContent = nom(c.uuid); $("cible").append(o);
+        }
+        if (c.properties.notify || c.properties.indicate) {
+          try {
+            c.addEventListener("characteristicvaluechanged", (e) => paquet(c.uuid, e.target.value));
+            await c.startNotifications();
+            log("      abonné (notifications/indications).");
+          } catch (e) { log("      ⚠ abonnement impossible : " + e.name + " – " + e.message); }
+        }
+      }
+    }
+    // Préfère la caractéristique dont l'UUID commence par 00000003 (réception des commandes, d'après les projets non officiels).
+    const pref = Object.keys(ecrivables).find((u) => u.startsWith("00000003"));
+    if (pref) $("cible").value = pref;
+    $("resume").textContent = infos.join(" · ") || "–";
+    setEtat("connecté : " + (appareil.name || "appareil sans nom"), true);
+    majBoutons(true);
+    log("Prêt. Appuie sur les boutons du Click (+, −) et regarde les paquets reçus.");
+  } catch (e) {
+    if (e && e.name === "NotFoundError") log("Aucun appareil choisi.");
+    else { log("⚠ " + (e && e.name) + " – " + (e && e.message)); log("   Pistes : le Click est-il déjà connecté à Zwift (téléphone, ordinateur) ? Bluetooth autorisé pour Chrome ? Appuie sur un bouton du Click pour le réveiller."); }
+    setEtat("non connecté", false); majBoutons(false);
+  }
+  $("bConnecter").disabled = false;
+}
+function paquet(uuid, dv) {
+  const n = (compte[uuid] = (compte[uuid] || 0) + 1);
+  const h = hex(dv), c = court(uuid);
+  const id = c !== null ? "0x" + c.toString(16) : uuid.slice(0, 8);
+  const change = precedent[uuid] === h ? "  (identique)" : "";
+  precedent[uuid] = h;
+  log("← " + id + " #" + n + " (" + dv.byteLength + " o)  " + h + change);
+}
+async function rideOn() {
+  const c = ecrivables[$("cible").value];
+  if (!c) { log("Aucune caractéristique en écriture choisie."); return; }
+  const data = Uint8Array.from(RIDEON);
+  log("→ écriture sur " + nom(c.uuid) + " : " + hex(new DataView(data.buffer)) + "  (« RideOn »)");
+  try { if (c.properties.writeWithoutResponse && !c.properties.write) await c.writeValueWithoutResponse(data); else await c.writeValueWithResponse(data); log("   écriture acceptée."); }
+  catch (e) { log("⚠ écriture refusée : " + e.name + " – " + e.message); }
+}
+function majBoutons(ok) { $("bDeconnecter").disabled = !ok; $("bRideOn").disabled = !ok || !$("cible").options.length; $("cible").disabled = !ok || !$("cible").options.length; }
+$("bConnecter").onclick = connecter;
+$("bDeconnecter").onclick = () => { if (appareil && appareil.gatt.connected) appareil.gatt.disconnect(); };
+$("bRideOn").onclick = rideOn;
+if (!navigator.bluetooth) { $("bConnecter").disabled = true; $("compat").textContent = "Web Bluetooth n'est pas disponible dans ce navigateur : utilise Chrome (ou Edge)."; }
+log("Page prête. Navigateur : " + (navigator.userAgent.match(/Chrome\/[\d.]+/) || ["?"])[0]);
+</script>
+</body>
+</html>

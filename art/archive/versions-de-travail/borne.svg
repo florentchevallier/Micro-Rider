@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="1200" viewBox="0 0 760 1200" fill="none">
+<title>Borne vélo — cadre avec écran transparent</title>
+<desc>Ouverture écran x=110 y=174 largeur=540 hauteur=810, ratio 2:3. Extérieur transparent.</desc>
+<defs>
+ <linearGradient id="body" x1="40" y1="0" x2="710" y2="1200" gradientUnits="userSpaceOnUse"><stop stop-color="#344657"/><stop offset=".45" stop-color="#172536"/><stop offset="1" stop-color="#0B1422"/></linearGradient>
+ <linearGradient id="trim" x1="50" x2="710" gradientUnits="userSpaceOnUse"><stop stop-color="#2EA9AC"/><stop offset=".5" stop-color="#A7F5DF"/><stop offset="1" stop-color="#227C8D"/></linearGradient>
+ <linearGradient id="deck" x1="0" y1="1000" x2="0" y2="1130" gradientUnits="userSpaceOnUse"><stop stop-color="#3A5062"/><stop offset="1" stop-color="#192A3D"/></linearGradient>
+ <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFD18B"/><stop offset="1" stop-color="#F36E35"/></linearGradient>
+ <mask id="cut"><rect width="760" height="1200" fill="white"/><rect x="110" y="174" width="540" height="810" rx="14" fill="black"/></mask>
+</defs>
+<g mask="url(#cut)">
+ <path d="M77 27Q77 14 95 14H665Q683 14 683 27L712 1018L738 1054V1133Q738 1152 716 1152H44Q22 1152 22 1133V1054L48 1018Z" fill="url(#body)" stroke="#080F1A" stroke-width="10"/>
+ <path d="M83 38L56 1026M677 38L704 1026" stroke="url(#trim)" stroke-width="12"/>
+ <rect x="95" y="38" width="570" height="105" rx="12" fill="#0C1828" stroke="#4A6473" stroke-width="3"/>
+ <path d="M122 114L148 73L168 102L186 82L208 114M552 114L573 83L588 98L608 66L636 114" stroke="#67D9C5" stroke-width="3" stroke-linejoin="round"/>
+ <text x="380" y="92" text-anchor="middle" fill="#F8EED7" font-family="Arial,sans-serif" font-weight="900" font-size="39" letter-spacing="4">SUMMIT</text>
+ <text x="380" y="119" text-anchor="middle" fill="#FFA568" font-family="Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="6">PEDAL • CLIMB • PLAY</text>
+ <rect x="96" y="160" width="568" height="838" rx="26" fill="#080F19" stroke="#4D6575" stroke-width="3"/>
+ <rect x="107" y="171" width="546" height="816" rx="17" stroke="#67D9C5" stroke-opacity=".6" stroke-width="3"/>
+ <path d="M72 226V365M688 226V365" stroke="#F8A46A" stroke-width="5" stroke-linecap="round"/>
+ <path d="M68 899L80 887M68 919L80 907M680 887L692 899M680 907L692 919" stroke="#72DAC7" stroke-width="4"/>
+ <path d="M49 1015H711L735 1055H25Z" fill="url(#deck)" stroke="#526778" stroke-width="3"/>
+ <path d="M27 1057H733V1130Q733 1145 714 1145H46Q27 1145 27 1130Z" fill="#142334"/>
+ <path d="M35 1064H725" stroke="url(#trim)" stroke-width="6"/>
+ <ellipse cx="143" cy="1040" rx="38" ry="10" fill="#0B1623"/>
+ <path d="M143 1038V1014" stroke="#8DA3AC" stroke-width="10"/>
+ <circle cx="143" cy="1005" r="19" fill="url(#orange)" stroke="#FBC898" stroke-width="2"/>
+ <ellipse cx="565" cy="1037" rx="25" ry="9" fill="#0B1623"/><ellipse cx="565" cy="1032" rx="21" ry="8" fill="#77E7CD"/>
+ <ellipse cx="632" cy="1037" rx="25" ry="9" fill="#0B1623"/><ellipse cx="632" cy="1032" rx="21" ry="8" fill="url(#orange)"/>
+ <text x="380" y="1041" text-anchor="middle" fill="#C9D7D8" font-family="Arial,sans-serif" font-size="11" letter-spacing="3">POWERED BY YOUR LEGS</text>
+ <g stroke="#476071" stroke-width="4" stroke-linecap="round"><path d="M84 1090H186M84 1102H186M84 1114H186M574 1090H676M574 1102H676M574 1114H676"/></g>
+ <rect x="320" y="1084" width="120" height="43" rx="8" fill="#091522" stroke="#395467" stroke-width="2"/>
+ <circle cx="342" cy="1106" r="4" fill="#7DEBCF"/><text x="391" y="1110" text-anchor="middle" fill="#92A9B4" font-family="Arial,sans-serif" font-size="10" letter-spacing="2">RIDE ON</text>
+ <path d="M66 1157H694V1176Q694 1184 683 1184H77Q66 1184 66 1176Z" fill="#09121E"/>
+</g>
+</svg>

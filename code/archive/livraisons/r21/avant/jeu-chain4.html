@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro-Rider · Chain Four</title>
+<style>
+:root{color-scheme:dark}
+html,body{margin:0;height:100%;background:#081530;color:#cfe2f7;font:14px system-ui,sans-serif}
+main{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px}
+.borne{position:relative;width:min(94vw,calc((100svh - 60px) * 2 / 3));aspect-ratio:1024/1536;user-select:none}
+.borne>img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.borne canvas{position:absolute;left:26.4%;top:18%;width:47.2%;height:38.1%;border-radius:3.5% / 2.8%;background:#06122b}
+.borne button{position:absolute;transform:translate(-50%,-50%);background:transparent;border:0;border-radius:50%;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.borne button:active,.borne button.on{background:rgba(255,255,255,.28)}
+.borne button:focus-visible{outline:3px solid #ffdd79}
+.aide{max-width:560px;text-align:center;font-size:12px;color:#8ea6c8}
+</style>
+</head>
+<body>
+<main>
+  <div class="borne" id="borne">
+    <img src="../art/bornes-jeux/borne-carree.png" alt="Borne d'arcade Micro-Rider">
+    <canvas id="ecran" aria-label="Chain Four: cabinet screen"></canvas>
+    <!-- Controls drawn on the cabinet (positions in % of the 1024 × 1536 image) -->
+    <button data-a="haut"   aria-label="Up"    style="left:33.2%;top:61.6%;width:3.6%;height:2.4%;border-radius:20%"></button>
+    <button data-a="bas"    aria-label="Down"     style="left:33.2%;top:65.2%;width:3.6%;height:2.4%;border-radius:20%"></button>
+    <button data-a="gauche" aria-label="Left"  style="left:29.6%;top:63.3%;width:3.2%;height:3.4%;border-radius:20%"></button>
+    <button data-a="droite" aria-label="Right"  style="left:36.8%;top:63.3%;width:3.2%;height:3.4%;border-radius:20%"></button>
+    <button data-a="menu"   aria-label="Menu"    style="left:46.4%;top:64.8%;width:5%;height:2.2%;border-radius:40%"></button>
+    <button data-a="menu2"  aria-label="Button 4" style="left:53.4%;top:64.8%;width:5%;height:2.2%;border-radius:40%"></button>
+    <button data-a="a"      aria-label="Confirm" style="left:62.8%;top:64%;width:7%;height:4.7%"></button>
+    <button data-a="b"      aria-label="Undo" style="left:71.3%;top:64%;width:7%;height:4.7%"></button>
+  </div>
+  <p class="aide">Keyboard: arrows = d-pad · Enter / Space = confirm · Backspace = undo · Esc = new game.<br>No time limit; your game is saved. (Add <code>?lang=fr</code> for French.)</p>
+</main>
+<script src="js/jeux/chain4.js"></script>
+<script src="js/jeux/chain4-ecran.js"></script>
+<script src="js/jeux/entrees.js"></script>
+<script>
+(function () {
+  const jeu = Chain4Ecran.creer(document.getElementById("ecran"), { langue: new URLSearchParams(location.search).get("lang") });
+  const entrees = Entrees.creer(document, (a) => jeu.action(a));
+  window.JEU = jeu;
+  for (const b of document.querySelectorAll(".borne button")) b.addEventListener("click", () => { const a = b.dataset.a; if (a !== "menu2") entrees.injecter(a); });
+})();
+</script>
+</body>
+</html>

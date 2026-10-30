@@ -1,0 +1,20 @@
+// Sons : logique de décision (fonctions pures) — pas de navigateur.
+const S = require("../code/js/son.js");
+let ok = 0, ko = 0; const t = (n, c, d) => { if (c) ok++; else { ko++; console.log("KO " + n + (d !== undefined ? " -> " + JSON.stringify(d) : "")); } };
+t("arrêt : silence", S.decider("pedale", 90, 0) === "silence" && S.decider("silence", 0, 1) === "silence");
+t("pédale à 85 tr/min : pédalage", S.decider("silence", 85, 25) === "pedale");
+t("roue libre : cadence nulle mais vitesse", S.decider("pedale", 0, 25) === "rouelibre");
+t("hystérésis : 12 tr/min reste en pédalage, mais pas en venant du silence", S.decider("pedale", 12, 20) === "pedale" && S.decider("rouelibre", 12, 20) === "rouelibre");
+t("hystérésis : sous 8 tr/min on passe en roue libre", S.decider("pedale", 6, 20) === "rouelibre");
+t("taux pédalage : 85 tr/min = 1", Math.abs(S.tauxPedalage(85) - 1) < 1e-9);
+t("taux pédalage borné 0,7 à 1,4", S.tauxPedalage(20) === 0.7 && S.tauxPedalage(200) === 1.4);
+t("boucle pédalage : 12 tours = 8,4706 s", Math.abs((S.PEDALAGE.fin - S.PEDALAGE.debut) - 12 * 60 / 85) < 1e-9 && S.PEDALAGE.fin < 9.75);
+t("vitesse du fichier : 25 km/h au début, décroît", Math.abs(S.vitesseFichier(0) - 25) < 1e-9 && S.vitesseFichier(5) < S.vitesseFichier(2) && S.vitesseFichier(9) < 12);
+let mono = true; for (let a = 0; a < 9.5; a += .1) if (S.vitesseFichier(a + .1) > S.vitesseFichier(a) + 1e-9) mono = false; t("vitesse du fichier strictement décroissante", mono);
+t("position pour 25 km/h et plus : début", S.positionPourVitesse(25) === 0 && S.positionPourVitesse(40) === 0);
+const p = S.positionPourVitesse(18); t("position pour 18 km/h : vitesse du fichier ≈ 18", Math.abs(S.vitesseFichier(p) - 18) < 0.05, [p, S.vitesseFichier(p)]);
+t("position pour très basse vitesse : dans la boucle", S.positionPourVitesse(3) >= S.ROUELIBRE.debutBoucle - 1 && S.positionPourVitesse(3) < S.ROUELIBRE.finBoucle);
+t("taux roue libre : vitesse = vitesse du fichier → 1", Math.abs(S.tauxRouelibre(18, p) - 1) < 0.01);
+t("taux roue libre borné 0,5 à 2", S.tauxRouelibre(2, 0) === 0.5 && S.tauxRouelibre(80, 9) === 2);
+t("gain vitesse : doux à basse vitesse, 1 à partir de 15 km/h", S.gainVitesse(3) === 0.35 && S.gainVitesse(30) === 1);
+console.log(`${ok} OK, ${ko} KO`);

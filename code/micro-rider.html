@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro Rider</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark;--fond:#081326;--carte:#0c1c34;--trait:#2f4663;--texte:#e8f3ff;--doux:#9db4d0;--accent:#63e5de}
+body{margin:0;background:var(--fond);color:var(--texte);font:14px system-ui,sans-serif}
+main{max-width:1500px;margin:auto;padding:12px 18px}
+body.borne-ouverte main{max-width:none}
+header,.barre{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+h1{margin:0 auto 0 0;font-size:20px;font-style:italic;color:var(--accent)}
+button,select,input[type=number]{background:#1a304b;border:1px solid #44607f;color:#fff;padding:8px 12px;border-radius:7px;font:inherit;cursor:pointer}
+button:disabled,select:disabled,input:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #ffdd79}
+button[aria-pressed=true]{background:#2a5a70;border-color:var(--accent)}
+button.conn{display:flex;align-items:center;gap:8px}
+button.conn::before{content:"";width:9px;height:9px;border-radius:50%;background:#6b7a90}
+button.conn.att::before{background:#ffd24a}button.conn.ok::before{background:#4bd86f}
+label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--doux)}
+input[type=number]{width:72px;cursor:text}
+.sep{width:1px;height:26px;background:var(--trait)}
+#etatSeance{font-size:12px;color:var(--doux);min-width:150px}
+#info{min-height:18px;color:#ffd7a0;font-size:12px;margin:4px 0 8px}
+.stage{display:flex;gap:14px;align-items:flex-start;justify-content:center;text-align:center}
+#colAnim{flex:1 1 0;position:relative;max-width:calc((100svh - var(--haut, 210px)) * 1200 / 1022);min-width:320px}
+#promenade{width:100%;display:block;margin:0;border-radius:11px;border:1px solid var(--trait)}
+#bBorne{position:absolute;left:8px;top:5px;z-index:2;width:34px;height:34px;padding:0;font-size:18px;line-height:1;border-radius:8px;background:#0b1930cc}
+#bBorne[aria-pressed=true]{background:#2a5a70;border-color:var(--accent)}
+#colBorne{flex:0 0 auto}
+.barreBorne{display:flex;align-items:center;gap:8px;height:40px;margin-bottom:6px}
+.barreBorne button#bRetourJeux{padding:5px 9px;font-size:12px}
+.pastilles{display:flex;gap:7px;margin-left:auto}
+.pastille{width:18px;height:18px;padding:0;border-radius:50%;border:2px solid #0008;box-shadow:0 0 0 1px #fff3}
+.pastille[aria-pressed=true]{box-shadow:0 0 0 2px #fff}
+[hidden]{display:none!important}
+details{background:var(--carte);border:1px solid var(--trait);border-radius:9px;padding:8px 12px;margin-top:10px}
+summary{cursor:pointer;font-size:12px;color:var(--doux)}
+.curseurs{display:grid;grid-template-columns:90px 1fr 60px;gap:8px 12px;align-items:center;max-width:520px;margin-top:10px;font-size:12px}
+.curseurs output{text-align:right;font-family:monospace}
+input[type=range]{width:100%;accent-color:#64e1d4}
+#journal{max-height:240px;overflow:auto;background:#050c18;border-radius:6px;padding:8px;font:11px/1.45 ui-monospace,monospace;white-space:pre-wrap;margin:8px 0 0}
+.libelle-vue{font-size:12px;line-height:1.3}.libelle-vue small{display:block;color:var(--doux);font-size:10px}
+.rocker{position:relative;width:43px;height:51px;padding:0;flex-shrink:0;border:4px solid #242930;border-radius:6px;background:linear-gradient(#ff8648,#eb431b 49%,#9b240d 51%,#dc3c18);box-shadow:0 2px 3px #000,inset 0 1px 2px #ffce8a;transform:perspective(110px) rotateX(-12deg);color:#ffe9bb;font:bold 13px monospace;display:flex;flex-direction:column;justify-content:space-around;align-items:center}
+.rocker[aria-checked=true]{background:linear-gradient(#ca3213,#f15e26 49%,#fd7739 51%,#b52b0e);transform:perspective(110px) rotateX(12deg);border-color:#353b43;box-shadow:0 0 12px #ff681c33}
+#optArcade{align-items:center}
+.sortie{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--doux)}
+.sortie button{padding:6px 10px;font-size:12px}
+.rapport{display:flex;align-items:center;gap:6px}
+.rapport button{width:36px;padding:8px 0;font-weight:bold;font-size:16px;line-height:1;transition:background .08s,box-shadow .08s}
+.rapport button.flash{background:var(--accent);color:#04202a;border-color:#fff;box-shadow:0 0 12px var(--accent)}
+.rapport .valeur{min-width:84px;text-align:center;font:bold 18px monospace;color:var(--accent)}
+.rapport .valeur small{font-size:11px;color:var(--doux)}
+.rapport.erg .valeur{color:#ffb86b}
+.rapport button.frein-actif{background:#c33;border-color:#fff;box-shadow:0 0 12px #f55}
+.rapport button.boost-actif{background:#e8a317;color:#201400;border-color:#fff;box-shadow:0 0 14px #ffb830}
+.rapport button.boost-attente{opacity:.55}
+.rapport button.refus{background:#5a2a2a;border-color:#c66}
+.rapport button#bFrein,.rapport button#bBoost{width:auto;padding:8px 10px;font-size:13px}
+.touches{display:grid;grid-template-columns:auto auto auto;gap:8px 12px;align-items:center;justify-content:start;margin-top:10px;font-size:12px}
+.touches kbd{background:#050c18;border:1px solid var(--trait);border-radius:5px;padding:3px 9px;font:12px ui-monospace,monospace;min-width:70px;text-align:center}
+#texteSortie{margin:4px 0;padding:2px 10px;border-left:3px solid #44607f;color:#b9cbe0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>micro rider</h1>
+    <button id="bPleinEcran" aria-pressed="false" title="Show the page full screen (Esc to exit)">⤢ Full screen</button>
+    <button id="bReglages" aria-expanded="false" aria-controls="reglages" title="Show or hide the settings (files, FTP, output, surface, sounds…) to leave more room for the animation">Settings ▾</button>
+    <span class="sep"></span>
+    <button id="bTrainer" class="conn"><span class="txt">Connect trainer</span></button>
+    <button id="bFc" class="conn"><span class="txt">Connect heart rate</span></button>
+    <button id="bCad" class="conn"><span class="txt">Connect cadence</span></button>
+    <button id="bClick" class="conn"><span class="txt">Connect Click</span></button>
+  </header>
+
+  <div class="barre" aria-label="Workout">
+    <label>Workout <select id="seance"></select></label>
+    <button id="bDemarrer" disabled>Start</button>
+    <button id="bArreter" disabled>Stop</button>
+    <span id="etatSeance"></span>
+    <span class="sep"></span>
+    <span class="rapport" id="groupeRapport" role="group" aria-label="Virtual gear">
+      <button id="bMoins" aria-label="Easier gear" title="Easier">−</button>
+      <span class="valeur" id="rapport" aria-live="polite">10<small>/24</small></span>
+      <button id="bPlus" aria-label="Harder gear" title="Harder">+</button>
+      <button id="bFrein" title="Brake: slows the virtual bike while held">Brake</button>
+      <button id="bBoost" title="Boost: +20 % speed for 5 s">Boost</button>
+    </span>
+  </div>
+  <div class="barre" id="reglages" hidden aria-label="Settings">
+    <label class="fichier"><button type="button" onclick="document.getElementById('fichier').click()">Load a file…</button>
+      <input id="fichier" type="file" accept=".zwo,.mrc,.erg,.json" hidden></label>
+    <button id="bDossier" type="button" hidden title="Workout folder (.zwo, .mrc, .erg, .json), remembered: no need to reload the files">Workout folder…</button>
+    <button id="bDossierAutre" type="button" hidden title="Pick another workout folder">Other folder…</button>
+    <label>FTP <input id="ftp" type="number" min="50" max="600" step="5" value="250"> W</label>
+    <label>Max HR <input id="fcmax" type="number" min="100" max="230" step="1" value="190"> bpm</label>
+    <span class="sep"></span>
+    <span style="display:flex;align-items:center;gap:6px" role="group" aria-label="Workout graph zoom">
+      <label title="Share of the workout graph width taken by the zoomed area (last minute + next 10 minutes). 0 % = no zoom. The zoom fades in gradually at start.">Zoom <input type="range" id="zoom" min="0" max="80" step="5" style="width:100px"><output id="zoomVal" style="min-width:36px"></output></label>
+      <button type="button" data-zoom="33" title="Zoomed area on 1/3 of the width">1/3</button><button type="button" data-zoom="50" title="Zoomed area on half the width">1/2</button><button type="button" data-zoom="70" title="Zoomed area on 70 % of the width (default)">70 %</button>
+    </span>
+    <span class="sep"></span>
+    <span class="sortie" id="groupeSortie">
+      <span id="etatSortie" aria-live="polite">Ride: nothing recorded</span>
+      <button id="bFit" disabled title="Download the ride as a .fit file: Strava files it as “Virtual Ride”">Download .fit</button>
+      <button id="bTcx" disabled title="Download the ride as a .tcx file (Strava, Garmin Connect, TrainingPeaks…)">Download .tcx</button>
+      <button id="bCopier" disabled title="Copy the suggested title and description (paste them into Strava: it does not read them from the file)">Copy title + description</button>
+      <button id="bNouvelle" disabled title="Erase the recorded ride and start over">New ride</button>
+    </span>
+    <span class="sep"></span>
+    <span id="optPromenade" style="display:flex;gap:10px"><label>Surface <select id="surface"></select></label>
+      <label>Cyclists <select id="cyclistes"></select></label>
+      <label title="A car passes the other way, only while you pedal">Car <select id="voiture"></select></label><button id="bVoiture" title="Send the car by now (to see it)">Car!</button>
+      <label title="Scrolls the scenery faster than the displayed speed, if the sense of speed is too low">Scrolling <select id="defilement"><option value="0">base</option><option value="20">+20 %</option><option value="40">+40 %</option><option value="60">+60 %</option><option value="80">+80 %</option><option value="100">+100 %</option></select></label></span>
+    <span class="sep"></span>
+    <span id="optArcade" style="display:flex;gap:10px;align-items:center">
+      <label>Cabinet <select id="borne"></select></label>
+      <label>World <select id="monde"></select></label>
+      <label title="Cabinet controls rendering (real sprites for the 90s cabinet, full view)">Controls <select id="commandes"><option value="sprites">sprites only</option><option value="sprites-halos">sprites + halos</option><option value="halos">halos only</option></select></label>
+    </span>
+    <span class="sep"></span>
+    <span id="optSons" style="display:flex;gap:8px;align-items:center"><button id="bMuet" aria-pressed="false" title="Mute all sound">🔊</button>
+      <label title="Pedalling noise volume">Pedalling <input type="range" id="volPedalage" min="0" max="100" style="width:64px"></label>
+      <label title="Freewheel volume">Freewheel <input type="range" id="volRouelibre" min="0" max="100" style="width:64px"></label>
+      <label title="Birds volume">Birds <input type="range" id="volOiseaux" min="0" max="100" style="width:64px"></label>
+      <label title="Car volume">Car <input type="range" id="volVoiture" min="0" max="100" style="width:64px"></label>
+      <label title="Game sound effects volume">Games <input type="range" id="volJeux" min="0" max="100" style="width:64px"></label></span>
+  </div>
+  <div id="texteSortie" hidden title="Suggested title and description for Strava"></div>
+  <div id="info" role="status" aria-live="polite"></div>
+
+  <div class="stage">
+    <div id="colBorne" hidden>
+      <div class="barreBorne">
+        <button class="rocker" id="bascule" role="switch" aria-checked="false" aria-label="Game mode, large screen"><span>I</span><span>O</span></button>
+        <span id="libelleVue" class="libelle-vue"></span>
+        <button id="bRetourJeux" title="Back to the games menu">↩ Games</button>
+        <span id="pastilles" class="pastilles" role="group" aria-label="Cabinet look"></span>
+      </div>
+      <div id="arcade"></div>
+    </div>
+    <div id="colAnim">
+      <button id="bBorne" aria-pressed="false" title="Open or close the arcade cabinet (games on the left of the animation)">🕹️</button>
+      <canvas id="promenade" aria-label="Ride: a cyclist seen from the side on an illustrated street, with the workout below"></canvas>
+    </div>
+  </div>
+
+  <details id="sim">
+    <summary>Simulation (no hardware)</summary>
+    <div class="curseurs">
+      <label for="sP">Power</label><input id="sP" type="range" min="0" max="500" step="5" value="150"><output id="oP"></output>
+      <label for="sC">Cadence</label><input id="sC" type="range" min="0" max="140" step="1" value="85"><output id="oC"></output>
+      <label for="sF">Heart rate</label><input id="sF" type="range" min="0" max="200" step="1" value="130"><output id="oF"></output>
+      <label for="suivre" style="grid-column:1/3">Power follows the workout target</label><input id="suivre" type="checkbox">
+    </div>
+  </details>
+  <details>
+    <summary>Options: keyboard keys</summary>
+    <div class="touches">
+      <span>Harder gear (+)</span><kbd id="kPlus"></kbd><button id="cPlus">Change…</button>
+      <span>Easier gear (−)</span><kbd id="kMoins"></kbd><button id="cMoins">Change…</button>
+      <span>Boost</span><kbd id="kBoost"></kbd><button id="cBoost">Change…</button>
+      <span>Brake (hold)</span><kbd id="kFrein"></kbd><button id="cFrein">Change…</button>
+      <span>Joystick left (no action for now)</span><kbd id="kGauche"></kbd><button id="cGauche">Change…</button>
+      <span>Joystick right (no action for now)</span><kbd id="kDroite"></kbd><button id="cDroite">Change…</button>
+    </div>
+    <div class="petit" id="infoTouches" style="font-size:12px;color:var(--doux);margin-top:8px">In free-resistance mode, − and + change gear (simulated slope). During an ERG step, they change the workout target by 5 % per notch (from −50 % to +50 %). The + and − keys mirror the two push buttons of the cabinet. Brake and boost only affect the virtual bike, never the trainer's resistance.</div>
+  </details>
+  <details id="optAppareils">
+    <summary>Options: remembered Bluetooth devices</summary>
+    <div class="touches">
+      <span>Trainer</span><kbd id="mTrainer"></kbd><button id="oTrainer">Forget</button>
+      <span>Heart rate</span><kbd id="mCardio"></kbd><button id="oCardio">Forget</button>
+      <span>Cadence sensor</span><kbd id="mCadence"></kbd><button id="oCadence">Forget</button>
+      <span>Click</span><kbd id="mClick"></kbd><button id="oClick">Forget</button>
+    </div>
+    <label style="margin-top:10px"><input type="checkbox" id="btAuto"> Reconnect automatically when the page starts</label>
+    <div id="infoAppareils" style="font-size:12px;color:var(--doux);margin-top:8px">The last device of each type is remembered. Clicking “Connect…” reconnects to it without reopening Chrome's list; “Forget” reopens the list on the next click.</div>
+  </details>
+  <details>
+    <summary>Bluetooth log</summary>
+    <button id="bCopierJournal" style="margin-top:8px">Copy log</button>
+    <pre id="journal"></pre>
+  </details>
+</main>
+<script src="js/assets.js"></script>
+<script src="js/parseurs.js"></script>
+<script src="js/noyau.js"></script>
+<script src="js/seances.js"></script>
+<script src="js/sortie.js"></script>
+<script src="js/fit.js"></script>
+<script src="js/dossier.js"></script>
+<script src="js/ble.js"></script>
+<script src="js/click.js"></script>
+<script src="js/son.js"></script>
+<script src="../art/bornes-jeux/console-portable/commandes/atlas.js"></script>
+<script src="../art/bornes-jeux/console-portable/commandes/correction-croix/mecanique.js"></script>
+<script src="../art/bornes-jeux/console-portable/dessin-commandes.js"></script>
+<script src="js/jeux/chain4.js"></script>
+<script src="js/jeux/chain4-ecran.js"></script>
+<script src="js/jeux/bataille.js"></script>
+<script src="js/jeux/bataille-ecran.js"></script>
+<script src="js/jeux/entrees.js"></script>
+<script src="js/jeux/pupitre.js"></script>
+<script src="js/jeux/borne-jeux.js"></script>
+<script src="js/mode-promenade.js"></script>
+<script src="js/mode-arcade.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

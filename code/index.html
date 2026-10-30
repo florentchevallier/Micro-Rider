@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Micro-Rider - jalon 2 (Bluetooth)</title>
+<style>
+  :root {
+    --bg: #12151c;
+    --panel: #1b2030;
+    --texte: #e8ecf4;
+    --discret: #8b94a8;
+    --puissance: #ff9a3c;
+    --cadence: #5ab4ff;
+    --fc: #ff5d6c;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--texte);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  h1 small { color: var(--discret); font-weight: 400; margin-left: 6px; }
+
+  button {
+    background: var(--panel); color: var(--texte);
+    border: 1px solid #2c3450; border-radius: 6px;
+    padding: 5px 10px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: #4a5680; }
+  button.actif { border-color: var(--puissance); color: var(--puissance); }
+
+  /* Les tuiles de mesures : s'adaptent à la largeur disponible */
+  .mesures { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 6px; }
+  .tuile { background: var(--panel); border-radius: 10px; padding: 6px 10px; }
+  .tuile .lib { display: block; font-size: 11px; color: var(--discret); text-transform: uppercase; letter-spacing: .04em; }
+  .tuile .val { font-size: clamp(20px, 2.6vw, 32px); font-variant-numeric: tabular-nums; }
+  .tuile .val i { font-size: .5em; font-style: normal; color: var(--discret); margin-left: 3px; }
+  .tuile.p .val { color: var(--puissance); }
+  .tuile.c .val { color: var(--cadence); }
+  .tuile.f .val { color: var(--fc); }
+
+  /* Zone du graphique : prend toute la place restante */
+  .zone { position: relative; flex: 1; min-height: 160px; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  .zone canvas { position: absolute; inset: 0; }
+
+  details.sim { background: var(--panel); border-radius: 10px; padding: 6px 10px; font-size: 13px; }
+  details.sim summary { cursor: pointer; color: var(--discret); }
+  .reglages { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; margin-top: 8px; align-items: center; }
+  .reglages label { display: flex; flex-direction: column; gap: 2px; color: var(--discret); }
+  .reglages label b { color: var(--texte); font-weight: 600; }
+  .reglages input[type=range] { width: 100%; }
+  .reglages input[type=number] { width: 80px; background: var(--bg); color: var(--texte); border: 1px solid #2c3450; border-radius: 4px; padding: 3px 6px; }
+  .rapide { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+  .reglages input:disabled { opacity: .35; }
+  button:disabled { opacity: .4; cursor: default; }
+
+  /* Connexions Bluetooth */
+  .connexions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .conn { display: inline-flex; align-items: center; gap: 7px; }
+  .conn .pt { width: 9px; height: 9px; border-radius: 50%; background: #4a5170; flex: none; }
+  .conn.ok .pt { background: #4ade80; }
+  .conn.att .pt { background: #facc15; }
+  #infoBle { font-size: 12px; color: var(--discret); }
+  details.journal pre { max-height: 220px; overflow: auto; background: var(--bg); border-radius: 6px; padding: 6px; margin: 8px 0 0;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; color: var(--discret); white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="titre"></h1>
+  <div class="rapide">
+    <button data-mode="plat" class="actif">Profil</button>
+    <button data-mode="iso">Relief 3D</button>
+    <span style="width:8px"></span>
+    <button id="bPause">Pause</button>
+    <button id="bReset">Recommencer</button>
+  </div>
+</header>
+
+<section class="connexions">
+  <button id="bTrainer" class="conn" title="Zwift Hub ou autre trainer FTMS"><span class="pt"></span><span class="txt">Connecter le trainer</span></button>
+  <button id="bFc" class="conn" title="Capteur cardio Bluetooth (HW9, montre en diffusion…)"><span class="pt"></span><span class="txt">Connecter le cardio</span></button>
+  <span id="infoBle"></span>
+</section>
+
+<section class="mesures">
+  <div class="tuile p"><span class="lib">Puissance</span><span class="val"><span id="mP">0</span><i>W</i></span></div>
+  <div class="tuile c"><span class="lib">Cadence</span><span class="val"><span id="mC">0</span><i>tr/min</i></span></div>
+  <div class="tuile f"><span class="lib">Fréq. cardiaque</span><span class="val"><span id="mF">0</span><i>bpm</i></span></div>
+  <div class="tuile"><span class="lib">Vitesse</span><span class="val"><span id="mV">0</span><i>km/h</i></span></div>
+  <div class="tuile"><span class="lib">Pente</span><span class="val"><span id="mG">0</span><i>%</i></span></div>
+  <div class="tuile"><span class="lib">Altitude</span><span class="val"><span id="mA">0</span><i>m</i></span></div>
+  <div class="tuile"><span class="lib">Reste</span><span class="val"><span id="mR">0</span><i>km</i></span></div>
+  <div class="tuile"><span class="lib">Temps</span><span class="val"><span id="mT">0:00:00</span></span></div>
+</section>
+
+<main class="zone"><canvas id="cv"></canvas></main>
+
+<details class="sim" id="sim" open>
+  <summary>Simulation (remplace les appareils non connectés)</summary>
+  <div class="reglages">
+    <label>Puissance <b><span id="sPv">200</span> W</b>
+      <input type="range" id="sP" min="0" max="600" step="5" value="200"></label>
+    <label>Cadence <b><span id="sCv">85</span> tr/min</b>
+      <input type="range" id="sC" min="0" max="130" step="1" value="85"></label>
+    <label>Fréquence cardiaque <b><span id="sFv">130</span> bpm</b>
+      <input type="range" id="sF" min="50" max="200" step="1" value="130"></label>
+    <label>Masse cycliste + vélo (kg)
+      <input type="number" id="sM" min="40" max="150" step="1" value="80"></label>
+    <div class="rapide">
+      <span style="color:var(--discret)">Vitesse du temps :</span>
+      <button data-x="1" class="actif">×1</button>
+      <button data-x="5">×5</button>
+      <button data-x="20">×20</button>
+      <button data-x="60">×60</button>
+    </div>
+  </div>
+</details>
+
+<details class="sim journal">
+  <summary>Journal Bluetooth</summary>
+  <div class="rapide" style="margin-top:8px"><button id="bCopier">Copier le journal</button></div>
+  <pre id="journal"></pre>
+</details>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   PARTIE 1 - LE NOYAU : les données du col et la physique.
+   Rien de visuel ici : on pourra le réutiliser tel quel avec la 3D plus tard.
+   ===================================================================== */
+// >>> NOYAU
+
+// --- Le col. Chaque tranche = [longueur en km, pente moyenne en %].
+// Pentes recopiées à la main depuis le profil de la 1re image : À VÉRIFIER.
+const COL = {
+  nom: "Alpe d'Huez",
+  altDepart: 726,
+  altArrivee: 1850,
+  tranches: [
+    [1, 10.4], [1, 10], [1, 8.5], [1, 9], [1, 7.5], [1, 9.5], [1, 8],
+    [1, 9], [1, 6.5], [1, 11.5], [1, 9], [1, 5], [1, 5], [0.8, 5.5]
+  ]
+};
+
+// Transforme la liste de tranches en segments avec distance et altitude de début/fin.
+// Les pentes lues sont très légèrement mises à l'échelle pour que l'altitude
+// d'arrivée tombe exactement sur celle du profil officiel (1850 m).
+function construireProfil(col) {
+  const gainBrut = col.tranches.reduce((s, [km, p]) => s + km * 1000 * p / 100, 0);
+  const k = (col.altArrivee - col.altDepart) / gainBrut;
+  const segs = [];
+  let d = 0, alt = col.altDepart;
+  for (const [km, p] of col.tranches) {
+    const longueur = km * 1000;
+    const pente = p * k;                       // pente utilisée par la physique (%)
+    const gain = longueur * pente / 100;
+    segs.push({ d0: d, d1: d + longueur, alt0: alt, alt1: alt + gain, pente, penteLue: p });
+    d += longueur;
+    alt += gain;
+  }
+  return { segs, total: d };
+}
+const PROFIL = construireProfil(COL);
+
+function segmentA(d) {
+  for (const s of PROFIL.segs) if (d < s.d1) return s;
+  return PROFIL.segs[PROFIL.segs.length - 1];
+}
+function altitudeA(d) {
+  const s = segmentA(d);
+  const t = Math.min(Math.max((d - s.d0) / (s.d1 - s.d0), 0), 1);
+  return s.alt0 + t * (s.alt1 - s.alt0);
+}
+
+// --- Pente lissée. Les tranches ont chacune une pente constante ; à la frontière entre
+// deux tranches, la pente passe de l'une à l'autre progressivement, sur TRANSITION_M mètres
+// centrés sur la frontière. Le dénivelé total est conservé (l'écart d'altitude avec le profil
+// à tranches reste d'environ 1 m au maximum). La physique, l'affichage de la pente et la
+// commande envoyée au trainer utilisent tous cette même valeur.
+const TRANSITION_M = 200;
+function penteA(d) {
+  const segs = PROFIL.segs;
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    if (i < segs.length - 1) {
+      const n = segs[i + 1];
+      const h = Math.min(TRANSITION_M / 2, (s.d1 - s.d0) / 2, (n.d1 - n.d0) / 2);
+      if (d >= s.d1 - h && d <= s.d1 + h) {
+        const t = (d - (s.d1 - h)) / (2 * h);
+        return s.pente + (n.pente - s.pente) * t;
+      }
+    }
+    if (d < s.d1) return s.pente;
+  }
+  return segs[segs.length - 1].pente;
+}
+
+// --- La physique : bilan des forces sur le cycliste.
+// Force motrice = puissance (après pertes de transmission) / vitesse.
+// Forces qui s'y opposent : gravité (pente), roulement, air.
+const PHYS = { g: 9.81, crr: 0.005, cda: 0.32, rho: 1.2, rendement: 0.975 };
+
+function pasPhysique(v, puissance, pentePct, masse, dt) {
+  const tan = pentePct / 100;
+  const cos = 1 / Math.sqrt(1 + tan * tan);
+  const sin = tan * cos;
+  const fMotrice = PHYS.rendement * puissance / Math.max(v, 1);   // max(v,1) évite la division par ~0 au départ
+  const fResist = masse * PHYS.g * (sin + PHYS.crr * cos) + 0.5 * PHYS.rho * PHYS.cda * v * v;
+  const a = (fMotrice - fResist) / masse;                         // F = m.a
+  return Math.max(0, v + a * dt);                                 // on ne recule pas
+}
+
+// --- L'état de la course et les entrées.
+// "entree" est ce que le jeu reçoit : rempli par le Bluetooth (trainer, capteur cardio)
+// ou, pour une source non connectée, par les curseurs de simulation.
+// "pLisse" est la puissance lissée utilisée par la physique : le trainer n'envoie qu'une
+// valeur par seconde, et un lissage exponentiel (constante de temps LISSAGE_S) évite les à-coups.
+const LISSAGE_S = 2;
+const etat = { d: 0, v: 0, t: 0, fini: false, pause: false, pauseAuto: false, vitesseTemps: 1, masse: 80, pLisse: 0 };
+const entree = { puissance: 200, cadence: 85, fc: 130 };
+
+function avancer(dtTotal) {
+  const pas = 0.05;                          // pas de calcul : 50 ms
+  let reste = dtTotal;
+  while (reste > 1e-9 && !etat.fini) {
+    const h = Math.min(pas, reste);
+    reste -= h;
+    etat.pLisse += (entree.puissance - etat.pLisse) * (1 - Math.exp(-h / LISSAGE_S));
+    etat.v = pasPhysique(etat.v, etat.pLisse, penteA(etat.d), etat.masse, h);
+    etat.d += etat.v * h;
+    etat.t += h;
+    if (etat.d >= PROFIL.total) { etat.d = PROFIL.total; etat.fini = true; }
+  }
+}
+
+function recommencer() {
+  etat.d = 0; etat.v = 0; etat.t = 0; etat.fini = false; etat.pLisse = 0;
+}
+// <<< NOYAU
+
+/* =====================================================================
+   PARTIE 2 - L'AFFICHAGE : tuiles de mesures et graphique du profil.
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+const fmt = (n, dec = 0) => n.toFixed(dec).replace(".", ",");
+function fmtTemps(sec) {
+  const s = Math.floor(sec);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h + ":" + String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+}
+
+$("titre").innerHTML = COL.nom +
+  "<small>" + fmt(PROFIL.total / 1000, 1) + " km à " +
+  fmt((COL.altArrivee - COL.altDepart) / PROFIL.total * 100, 1) + " %</small>";
+
+function majMesures() {
+  $("mP").textContent = Math.round(entree.puissance);
+  $("mC").textContent = Math.round(entree.cadence);
+  $("mF").textContent = entree.fc > 0 ? Math.round(entree.fc) : "–";
+  $("mV").textContent = fmt(etat.v * 3.6, 1);
+  $("mG").textContent = fmt(penteA(etat.d), 1);
+  $("mA").textContent = Math.round(altitudeA(etat.d));
+  $("mR").textContent = fmt((PROFIL.total - etat.d) / 1000, 1);
+  $("mT").textContent = fmtTemps(etat.t);
+}
+
+// --- Le canvas : on le recalcule à chaque changement de taille de la zone.
+const cv = $("cv"), ctx = cv.getContext("2d");
+let W = 300, H = 200;
+function ajusterCanvas() {
+  const r = cv.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;       // écrans Retina : plus de pixels, même taille
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(ajusterCanvas).observe(cv.parentElement);
+
+function couleurPente(p) {
+  if (p < 4) return "#4ade80";
+  if (p < 7) return "#facc15";
+  if (p < 9) return "#fb923c";
+  if (p < 11) return "#ef4444";
+  return "#c026d3";
+}
+
+// Repères du graphique (marges, échelles)
+// (la marge du haut laisse la place au cycliste quand il arrive au sommet)
+const MARGE = { g: 44, d: 14, h: 52, b: 24 };
+const altMin = Math.floor((COL.altDepart - 20) / 100) * 100;
+const altMax = Math.ceil((COL.altArrivee + 20) / 100) * 100;
+const X = (d) => MARGE.g + d / PROFIL.total * (W - MARGE.g - MARGE.d);
+const Y = (alt) => H - MARGE.b - (alt - altMin) / (altMax - altMin) * (H - MARGE.h - MARGE.b);
+
+function dessinerSegments(alpha, coupeX) {
+  ctx.save();
+  if (coupeX !== undefined) {
+    ctx.beginPath(); ctx.rect(0, 0, coupeX, H); ctx.clip();
+  }
+  ctx.globalAlpha = alpha;
+  for (const s of PROFIL.segs) {
+    ctx.fillStyle = couleurPente(s.pente);
+    ctx.beginPath();
+    ctx.moveTo(X(s.d0), Y(altMin));
+    ctx.lineTo(X(s.d0), Y(s.alt0));
+    ctx.lineTo(X(s.d1), Y(s.alt1));
+    ctx.lineTo(X(s.d1), Y(altMin));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Petit cycliste dessiné au trait. La jambe tourne avec la cadence.
+let phasePedale = 0;
+function dessinerCycliste(x, y, angle) {
+  const u = Math.max(8, Math.min(16, H / 16));       // taille de base
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(u, u);
+  ctx.lineWidth = 0.16; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = "#e8ecf4"; ctx.fillStyle = "#e8ecf4";
+
+  // roues
+  for (const cx of [-1.1, 1.1]) { ctx.beginPath(); ctx.arc(cx, -0.6, 0.6, 0, 7); ctx.stroke(); }
+  // cadre
+  ctx.beginPath();
+  ctx.moveTo(-1.1, -0.6); ctx.lineTo(-0.5, -1.5); ctx.lineTo(0.8, -1.5); ctx.lineTo(1.1, -0.6);
+  ctx.moveTo(-0.5, -1.5); ctx.lineTo(0, -0.6); ctx.lineTo(0.8, -1.5);
+  ctx.stroke();
+
+  // cycliste (couleur d'accent)
+  ctx.strokeStyle = "#ff9a3c"; ctx.fillStyle = "#ff9a3c"; ctx.lineWidth = 0.22;
+  const hanche = [-0.5, -1.75], epaule = [0.45, -2.45], mains = [0.85, -1.6];
+  const pied = [Math.cos(phasePedale) * 0.35, -0.6 + Math.sin(phasePedale) * 0.35];
+  const genou = [(hanche[0] + pied[0]) / 2 + 0.3, (hanche[1] + pied[1]) / 2];
+  ctx.beginPath();
+  ctx.moveTo(...hanche); ctx.lineTo(...genou); ctx.lineTo(...pied);   // jambe
+  ctx.moveTo(...hanche); ctx.lineTo(...epaule); ctx.lineTo(...mains); // dos + bras
+  ctx.stroke();
+  ctx.beginPath(); ctx.arc(0.7, -2.95, 0.3, 0, 7); ctx.fill();        // tête
+  ctx.restore();
+}
+
+// --- Mode "Profil" : vue de côté à plat.
+function dessinerPlat() {
+  ctx.clearRect(0, 0, W, H);
+
+  // grille d'altitude tous les 200 m
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  ctx.lineWidth = 1;
+  for (let a = altMin + 100; a <= altMax; a += 200) {
+    ctx.strokeStyle = "rgba(255,255,255,.07)";
+    ctx.beginPath(); ctx.moveTo(MARGE.g, Y(a)); ctx.lineTo(W - MARGE.d, Y(a)); ctx.stroke();
+    ctx.fillStyle = "#8b94a8";
+    ctx.fillText(a + " m", MARGE.g - 6, Y(a));
+  }
+
+  // zone parcourue (vive) et zone à venir (atténuée)
+  dessinerSegments(0.28);
+  dessinerSegments(0.95, X(etat.d));
+
+  // ligne du profil, colorée selon la pente
+  ctx.lineWidth = 3; ctx.lineJoin = "round";
+  for (const s of PROFIL.segs) {
+    ctx.strokeStyle = couleurPente(s.pente);
+    ctx.beginPath(); ctx.moveTo(X(s.d0), Y(s.alt0)); ctx.lineTo(X(s.d1), Y(s.alt1)); ctx.stroke();
+  }
+
+  // pente de chaque tranche, et repères kilométriques
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const largeurKm = (X(1000) - X(0));
+  for (const s of PROFIL.segs) {
+    if (X(s.d1) - X(s.d0) < 30) continue;
+    ctx.fillStyle = "rgba(0,0,0,.65)";
+    ctx.fillText(fmt(s.penteLue, 1).replace(",0", ""), (X(s.d0) + X(s.d1)) / 2, Y(altMin) - 6);
+  }
+  ctx.fillStyle = "#8b94a8";
+  const pasKm = largeurKm < 26 ? 2 : 1;
+  for (let km = 0; km * 1000 <= PROFIL.total + 1; km += pasKm) {
+    ctx.fillText(km, X(km * 1000), H - 8);
+  }
+  ctx.textAlign = "right";
+  ctx.fillText("km", W - MARGE.d, H - 8);
+
+  // arrivée
+  ctx.textAlign = "right"; ctx.fillStyle = "#e8ecf4";
+  ctx.fillText(COL.altArrivee + " m", X(PROFIL.total) - 4, Y(COL.altArrivee) - 8);
+
+  // cycliste : orienté selon la pente à l'écran
+  const dd = 40;
+  const d0 = Math.max(0, etat.d - dd), d1 = Math.min(PROFIL.total, etat.d + dd);
+  const angle = Math.atan2(Y(altitudeA(d1)) - Y(altitudeA(d0)), X(d1) - X(d0));
+  dessinerCycliste(X(etat.d), Y(altitudeA(etat.d)), angle);
+  dessinerSommet();
+}
+
+function dessinerSommet() {
+  if (!etat.fini) return;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = "600 20px system-ui, sans-serif";
+  ctx.fillStyle = "#e8ecf4";
+  ctx.fillText("Sommet ! " + fmtTemps(etat.t), W / 2, H * 0.28);
+  ctx.font = "11px system-ui, sans-serif";
+}
+
+// --- Mode "Relief 3D" : la même coupe du col, mais en dalle vue en perspective
+// oblique, comme sur le profil du Tour. La route a une largeur (la "profondeur")
+// et sa surface est colorée selon la pente.
+// Idée de projection : un point (distance d, altitude, profondeur p) s'affiche en
+//   x = X(d) - p * cos(30°)      y = Y(altitude) - p * sin(30°)
+// c'est-à-dire que la profondeur part en diagonale vers le HAUT et la GAUCHE.
+// (Vers la droite, la diagonale serait presque parallèle à la pente du col à
+// l'écran et la route paraîtrait filiforme.)
+function dessinerIso() {
+  ctx.clearRect(0, 0, W, H);
+
+  const prof = Math.max(16, Math.min(46, H * 0.12));      // largeur de la route à l'écran (px)
+  const dx = prof * Math.cos(Math.PI / 6), dy = prof * Math.sin(Math.PI / 6);
+  // Marges adaptées : la dalle déborde de dx à gauche et de dy en haut
+  const gx = MARGE.g, gx0 = MARGE.g + dx, hm = MARGE.h + dy, bm = MARGE.b;
+  const Xi = (d) => gx0 + d / PROFIL.total * (W - gx0 - MARGE.d);
+  const Yi = (alt) => H - bm - (alt - altMin) / (altMax - altMin) * (H - hm - bm);
+  // Un point de la dalle (p = 0 : face avant, p = 1 : face arrière)
+  const P = (d, alt, p) => [Xi(d) - p * dx, Yi(alt) - p * dy];
+  const trace = (pts) => { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); };
+
+  const total = PROFIL.total, segs = PROFIL.segs;
+  // Ligne de "coupe" qui suit le cycliste, tracée dans le sens de la profondeur :
+  // tout ce qui est à sa gauche est déjà roulé. Le polygone ci-dessous est ce côté gauche.
+  const base = P(etat.d, altitudeA(etat.d), 0);
+  const ux = -Math.cos(Math.PI / 6), uy = -Math.sin(Math.PI / 6), L = 3000;
+  const haut = [base[0] + L * ux, base[1] + L * uy], bas = [base[0] - L * ux, base[1] - L * uy];
+  const zoneRoulee = [haut, bas, [bas[0] - 5000, bas[1]], [haut[0] - 5000, haut[1]]];
+
+  // 1. Grille d'altitude (sur le plan avant)
+  ctx.font = "11px system-ui, sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.lineWidth = 1;
+  for (let a = altMin + 100; a <= altMax; a += 200) {
+    ctx.strokeStyle = "rgba(255,255,255,.07)";
+    ctx.beginPath(); ctx.moveTo(gx, Yi(a)); ctx.lineTo(W - MARGE.d, Yi(a)); ctx.stroke();
+    ctx.fillStyle = "#8b94a8";
+    ctx.fillText(a + " m", gx - 6, Yi(a));
+  }
+
+  // 2. Face avant de la dalle (terrain), avec un dégradé de roche
+  const profilAvant = [P(0, altMin, 0)];
+  segs.forEach((s) => profilAvant.push(P(s.d0, s.alt0, 0)));
+  profilAvant.push(P(total, COL.altArrivee, 0), P(total, altMin, 0));
+  const degrade = ctx.createLinearGradient(0, Yi(COL.altArrivee), 0, Yi(altMin));
+  degrade.addColorStop(0, "#6e5d3d"); degrade.addColorStop(1, "#2c2820");
+  ctx.fillStyle = degrade; trace(profilAvant); ctx.fill();
+
+  // repères kilométriques sur la face avant
+  ctx.strokeStyle = "rgba(255,255,255,.10)"; ctx.setLineDash([3, 4]);
+  for (let km = 1; km * 1000 < total; km++) {
+    ctx.beginPath(); ctx.moveTo(Xi(km * 1000), Yi(altMin)); ctx.lineTo(Xi(km * 1000), Yi(altitudeA(km * 1000)));
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // 3. Face de gauche (la coupe au départ), plus sombre
+  ctx.fillStyle = "#1f1c16";
+  trace([P(0, altMin, 0), P(0, COL.altDepart, 0), P(0, COL.altDepart, 1), P(0, altMin, 1)]);
+  ctx.fill();
+
+  // 4. La route : une bande par tranche, colorée selon la pente.
+  //    D'abord atténuée (à venir), puis vive là où le cycliste est déjà passé.
+  function route(alpha, zone) {
+    ctx.save();
+    if (zone !== undefined) { trace(zone); ctx.clip(); }
+    ctx.globalAlpha = alpha;
+    for (const s of segs) {
+      const c = couleurPente(s.pente);
+      ctx.fillStyle = c; ctx.strokeStyle = c; ctx.lineWidth = 1;
+      trace([P(s.d0, s.alt0, 0), P(s.d1, s.alt1, 0), P(s.d1, s.alt1, 1), P(s.d0, s.alt0, 1)]);
+      ctx.fill(); ctx.stroke();                          // le trait masque les fines coutures entre bandes
+    }
+    // tranche avant de la route (son épaisseur), plus sombre
+    ctx.lineWidth = 5; ctx.lineCap = "butt";
+    for (const s of segs) {
+      const a = P(s.d0, s.alt0, 0), b = P(s.d1, s.alt1, 0);
+      ctx.strokeStyle = couleurPente(s.pente);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      ctx.strokeStyle = "rgba(0,0,0,.4)";
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  route(0.45);
+  route(1, zoneRoulee);
+
+  // ligne centrale en pointillés
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1.2; ctx.setLineDash([6, 7]);
+  ctx.beginPath();
+  segs.forEach((s, i) => { const q = P(s.d0, s.alt0, 0.5); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+  const fin = P(total, COL.altArrivee, 0.5); ctx.lineTo(fin[0], fin[1]);
+  ctx.stroke();
+  ctx.restore();
+
+  // 5. Pentes de chaque tranche (sur la face avant) et repères km
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  for (const s of segs) {
+    if (Xi(s.d1) - Xi(s.d0) < 30) continue;
+    ctx.fillStyle = "rgba(255,255,255,.55)";
+    ctx.fillText(fmt(s.penteLue, 1).replace(",0", "") + "%", (Xi(s.d0) + Xi(s.d1)) / 2, Yi(altMin) - 6);
+  }
+  ctx.fillStyle = "#8b94a8";
+  const pasKm = (Xi(1000) - Xi(0)) < 26 ? 2 : 1;
+  for (let km = 0; km * 1000 <= total + 1; km += pasKm) ctx.fillText(km, Xi(km * 1000), H - 8);
+  ctx.textAlign = "right"; ctx.fillText("km", W - MARGE.d, H - 8);
+  ctx.fillStyle = "#e8ecf4";
+  ctx.fillText(COL.altArrivee + " m", P(total, COL.altArrivee, 0)[0], P(total, COL.altArrivee, 1)[1] - 6);
+
+  // 6. Le cycliste, au milieu de la route, orienté selon la pente à l'écran
+  const d0 = Math.max(0, etat.d - 40), d1 = Math.min(total, etat.d + 40);
+  const a0 = P(d0, altitudeA(d0), 0.5), a1 = P(d1, altitudeA(d1), 0.5);
+  const angle = Math.atan2(a1[1] - a0[1], a1[0] - a0[0]);
+  const pos = P(etat.d, altitudeA(etat.d), 0.5);
+  dessinerCycliste(pos[0], pos[1], angle);
+  dessinerSommet();
+}
+
+// Le mode affiché : "plat" ou "iso". Le noyau (physique, état) ne dépend pas de ce choix.
+let mode = "plat";
+function dessiner() {
+  if (mode === "iso") dessinerIso(); else dessinerPlat();
+}
+
+/* =====================================================================
+   PARTIE 3 - LES COMMANDES (simulation) et la boucle principale.
+   ===================================================================== */
+function lierCurseur(idCurseur, idTexte, cle) {
+  const el = $(idCurseur);
+  const maj = () => { entree[cle] = Number(el.value); $(idTexte).textContent = el.value; };
+  el.addEventListener("input", maj);
+  maj();
+}
+lierCurseur("sP", "sPv", "puissance");
+lierCurseur("sC", "sCv", "cadence");
+lierCurseur("sF", "sFv", "fc");
+
+$("sM").addEventListener("change", (e) => {
+  const m = Number(e.target.value);
+  if (m >= 40 && m <= 150) etat.masse = m;
+});
+
+function majPause() { $("bPause").textContent = etat.pause ? "Reprendre" : "Pause"; }
+$("bPause").addEventListener("click", () => {
+  etat.pause = !etat.pause;
+  etat.pauseAuto = false;
+  majPause();
+});
+$("bReset").addEventListener("click", recommencer);
+
+document.querySelectorAll("button[data-mode]").forEach((b) => {
+  b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll("button[data-mode]").forEach((o) => o.classList.toggle("actif", o === b));
+  });
+});
+
+document.querySelectorAll("button[data-x]").forEach((b) => {
+  b.addEventListener("click", () => {
+    etat.vitesseTemps = Number(b.dataset.x);
+    document.querySelectorAll("button[data-x]").forEach((o) => o.classList.toggle("actif", o === b));
+  });
+});
+
+/* =====================================================================
+   PARTIE 4 - LE BLUETOOTH : trainer (puissance, cadence, pente) et capteur cardio.
+   Les valeurs reçues remplissent l'objet "entree" : le noyau ne sait pas d'où elles viennent.
+   Les conversions d'octets ci-dessous sont celles testées dans ble-diagnostic.html.
+   ===================================================================== */
+// >>> PARSEURS
+
+// Un UUID Bluetooth court (ex. 0x2ad2) s'écrit en version longue standard :
+const canon = (n) => "0000" + n.toString(16).padStart(4, "0") + "-0000-1000-8000-00805f9b34fb";
+function uuidCourt(uuid) {
+  const m = /^0000([0-9a-f]{4})-0000-1000-8000-00805f9b34fb$/i.exec(uuid);
+  return m ? parseInt(m[1], 16) : null;
+}
+const hex = (dv) => Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength))
+  .map((b) => b.toString(16).padStart(2, "0")).join(" ");
+
+// Indoor Bike Data (FTMS, 0x2AD2). Le 1er champ (2 octets) dit quels champs suivent.
+// Piège de la norme : le bit 0 est INVERSÉ (vitesse présente quand il vaut 0).
+function parseIndoorBike(dv) {
+  let o = 0;
+  const flags = dv.getUint16(o, true); o += 2;
+  const r = {};
+  if (!(flags & 0x0001)) { r.vitesse = dv.getUint16(o, true) * 0.01; o += 2; }   // km/h
+  if (flags & 0x0002) { r.vitesseMoy = dv.getUint16(o, true) * 0.01; o += 2; }
+  if (flags & 0x0004) { r.cadence = dv.getUint16(o, true) * 0.5; o += 2; }       // tr/min
+  if (flags & 0x0008) { r.cadenceMoy = dv.getUint16(o, true) * 0.5; o += 2; }
+  if (flags & 0x0010) { r.distance = dv.getUint16(o, true) | (dv.getUint8(o + 2) << 16); o += 3; }  // m
+  if (flags & 0x0020) { r.resistance = dv.getInt16(o, true); o += 2; }
+  if (flags & 0x0040) { r.puissance = dv.getInt16(o, true); o += 2; }            // W
+  if (flags & 0x0080) { r.puissanceMoy = dv.getInt16(o, true); o += 2; }
+  if (flags & 0x0100) { r.energie = dv.getUint16(o, true); o += 5; }             // total, par heure, par minute
+  if (flags & 0x0200) { r.fc = dv.getUint8(o); o += 1; }
+  if (flags & 0x0400) { o += 1; }                                                // équivalent métabolique
+  if (flags & 0x0800) { r.temps = dv.getUint16(o, true); o += 2; }
+  if (flags & 0x1000) { o += 2; }
+  return r;
+}
+
+// Cycling Power Measurement (0x2A63) : puissance + éventuellement données de manivelle.
+function parseCyclingPower(dv) {
+  const flags = dv.getUint16(0, true);
+  let o = 2;
+  const r = { puissance: dv.getInt16(o, true) }; o += 2;
+  if (flags & 0x0001) o += 1;                       // équilibre gauche/droite
+  if (flags & 0x0004) o += 2;                       // couple cumulé
+  if (flags & 0x0010) o += 6;                       // données de roue
+  if (flags & 0x0020) {                             // données de manivelle
+    r.tours = dv.getUint16(o, true);                // tours cumulés
+    r.temps = dv.getUint16(o + 2, true);            // heure du dernier tour, en 1/1024 s
+    o += 4;
+  }
+  return r;
+}
+// Cadence = tours gagnés / temps écoulé entre deux paquets (compteurs sur 16 bits qui bouclent).
+function cadenceManivelle(prec, cur) {
+  if (!prec || cur.tours === undefined || prec.tours === undefined) return undefined;
+  const dTours = (cur.tours - prec.tours + 65536) % 65536;
+  const dTemps = (cur.temps - prec.temps + 65536) % 65536;
+  if (dTemps === 0) return undefined;               // pas de nouveau tour : on garde l'ancienne valeur
+  return dTours / (dTemps / 1024) * 60;
+}
+
+// Heart Rate Measurement (0x2A37).
+function parseHR(dv) {
+  const f = dv.getUint8(0);
+  let o = 1;
+  const r = {};
+  if (f & 0x01) { r.fc = dv.getUint16(o, true); o += 2; } else { r.fc = dv.getUint8(o); o += 1; }
+  const contact = (f >> 1) & 3;                     // 2 = pas de contact, 3 = contact, sinon non indiqué
+  r.contact = contact === 3 ? "OK" : contact === 2 ? "perdu" : "n/a";
+  if (f & 0x08) o += 2;                             // énergie dépensée
+  if (f & 0x10) {                                   // intervalles RR (1/1024 s -> ms)
+    r.rr = [];
+    while (o + 1 < dv.byteLength) { r.rr.push(Math.round(dv.getUint16(o, true) / 1024 * 1000)); o += 2; }
+  }
+  return r;
+}
+
+// Commandes du Control Point FTMS (0x2AD9) : on fabrique les octets à envoyer.
+const octetsSimulation = (pentePct) => {          // opcode 0x11 : vent, pente, roulement, aéro
+  const b = new Uint8Array(7), dv = new DataView(b.buffer);
+  dv.setUint8(0, 0x11);
+  dv.setInt16(1, 0, true);                        // vent : 0
+  dv.setInt16(3, Math.round(pentePct * 100), true); // pente en 0,01 %
+  dv.setUint8(5, 50);                             // coefficient de roulement 0,0050 (comme notre physique)
+  dv.setUint8(6, 19);                             // coefficient d'air 0,19 kg/m (CdA 0,32, rho 1,2)
+  return Array.from(b);
+};
+const octetsPuissance = (w) => [0x05, w & 0xff, (w >> 8) & 0xff];   // opcode 0x05 : puissance cible
+const OCTETS_CONTROLE = [0x00], OCTETS_DEMARRAGE = [0x07], OCTETS_STOP = [0x08, 0x01];
+const RESULTATS = { 1: "succès", 2: "non supporté", 3: "paramètre invalide", 4: "échec", 5: "non autorisé" };
+// <<< PARSEURS
+
+const NOMS = {
+  0x1826: "Fitness Machine (FTMS)", 0x1818: "Cycling Power", 0x180d: "Heart Rate", 0x180f: "Battery", 0x180a: "Device Information",
+  0x2acc: "FTMS Feature", 0x2ad2: "Indoor Bike Data", 0x2ad9: "FTMS Control Point", 0x2ada: "FTMS Status",
+  0x2ad3: "Training Status", 0x2ad6: "Supported Resistance Range", 0x2ad8: "Supported Power Range",
+  0x2a63: "Cycling Power Measurement", 0x2a65: "Cycling Power Feature", 0x2a5d: "Sensor Location",
+  0x2a37: "Heart Rate Measurement", 0x2a38: "Body Sensor Location", 0x2a39: "HR Control Point",
+  0x2a19: "Battery Level", 0x2a29: "Manufacturer Name", 0x2a24: "Model Number", 0x2a26: "Firmware Revision"
+};
+function nomUuid(uuid) {
+  const c = uuidCourt(uuid);
+  return c !== null ? "0x" + c.toString(16) + " " + (NOMS[c] || "(autre)") : uuid;
+}
+
+// --- Journal (consultable et copiable : sert au diagnostic)
+const lignes = [];
+function log(msg) {
+  const t = new Date();
+  lignes.push(t.toLocaleTimeString("fr-FR") + "." + String(t.getMilliseconds()).padStart(3, "0") + "  " + msg);
+  if (lignes.length > 600) lignes.shift();
+  const j = $("journal"); j.textContent = lignes.join("\n"); j.scrollTop = j.scrollHeight;
+}
+$("bCopier").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(lignes.join("\n")); log("Journal copié dans le presse-papiers."); }
+  catch (e) { log("Copie automatique impossible : sélectionne le texte du journal à la main."); }
+});
+const info = (t) => { $("infoBle").textContent = t || ""; };
+
+// --- État des connexions
+const TR = {
+  device: null, cp: null, connexion: false, connecte: false, controle: false,
+  ftms: null, power: null, precPower: null, cadManivelle: 0, tManivelle: 0, dernier: 0,
+  attente: null, file: Promise.resolve(), enVol: false, penteEnvoyee: null, penteLog: null, tPente: 0, tVerif: 0, echecs: 0
+};
+const FC = { device: null, connexion: false, connecte: false, hr: null, dernier: 0 };
+
+const decrire = (c) => ["read", "write", "writeWithoutResponse", "notify", "indicate"].filter((k) => c.properties[k]).join(", ");
+function erreurBle(qui, e) {
+  if (e && e.name === "NotFoundError") { log(qui + " : aucun appareil choisi."); info(""); return; }
+  log("⚠ " + qui + " : " + (e && e.name) + " – " + (e && e.message));
+  log("   Pistes : appareil déjà pris par une autre appli (Zwift, téléphone, montre) ? Bluetooth autorisé pour Chrome dans Réglages Système ?");
+  info("⚠ " + qui + " : " + ((e && e.message) || "erreur") + " (détails dans le journal Bluetooth)");
+}
+async function abonner(c, nom, traiter) {
+  try {
+    c.addEventListener("characteristicvaluechanged", (e) => traiter(e.target.value));
+    await c.startNotifications();
+    log("Abonné à " + nom + ".");
+  } catch (e) { log("⚠ abonnement à " + nom + " impossible : " + e.name + " – " + e.message); }
+}
+// Liste services et caractéristiques et renvoie un dictionnaire uuid -> caractéristique.
+async function inventaire(server) {
+  const parUuid = {};
+  const services = await server.getPrimaryServices();
+  for (const s of services) {
+    log("Service " + nomUuid(s.uuid));
+    let chars = [];
+    try { chars = await s.getCharacteristics(); } catch (e) { log("   ⚠ caractéristiques illisibles : " + e.message); }
+    for (const c of chars) { log("   " + nomUuid(c.uuid) + "  [" + decrire(c) + "]"); parUuid[c.uuid] = c; }
+  }
+  if (!services.length) log("⚠ aucun service accessible.");
+  return parUuid;
+}
+
+// --- Affichage de l'état : pastilles des boutons, curseurs de simulation
+function majBoutonsBle() {
+  for (const [id, S, nom, libre, titreLibre] of [
+    ["bTrainer", TR, "Trainer", "Connecter le trainer", "Zwift Hub ou autre trainer FTMS"],
+    ["bFc", FC, "Cardio", "Connecter le cardio", "Capteur cardio Bluetooth (HW9, montre en diffusion…)"]
+  ]) {
+    const b = $(id);
+    b.className = "conn" + (S.connecte ? " ok" : S.connexion ? " att" : "");
+    b.querySelector(".txt").textContent = S.connecte ? ((S.device && S.device.name) || nom) + "  ✕" : S.connexion ? "Connexion…" : libre;
+    b.title = S.connecte ? "Cliquer pour déconnecter" : titreLibre;
+  }
+}
+function relireCurseurs() {
+  entree.puissance = Number($("sP").value); entree.cadence = Number($("sC").value); entree.fc = Number($("sF").value);
+}
+function majSources() {
+  $("sP").disabled = TR.connecte; $("sC").disabled = TR.connecte; $("sF").disabled = FC.connecte;
+  document.querySelectorAll("button[data-x]").forEach((b) => { b.disabled = TR.connecte; });
+  if (TR.connecte) {                          // en conduite réelle, le temps ne peut pas être accéléré
+    etat.vitesseTemps = 1;
+    document.querySelectorAll("button[data-x]").forEach((b) => b.classList.toggle("actif", b.dataset.x === "1"));
+    $("sim").open = false;
+  }
+}
+
+// --- Valeurs reçues -> entree (avec péremption : sans nouveau paquet, on retombe à 0)
+function majEntreesBle(maintenant) {
+  if (TR.connecte) {
+    const frais = maintenant - TR.dernier < 4000;
+    const f = TR.ftms || {}, p = TR.power || {};
+    const puiss = f.puissance !== undefined ? f.puissance : p.puissance;
+    let cad = f.cadence;
+    if (cad === undefined) cad = (maintenant - TR.tManivelle < 2500) ? TR.cadManivelle : 0;
+    entree.puissance = frais ? Math.max(0, puiss || 0) : 0;
+    entree.cadence = frais ? Math.max(0, cad || 0) : 0;
+  }
+  if (FC.connecte) entree.fc = (FC.hr && maintenant - FC.dernier < 5000) ? FC.hr.fc : 0;
+}
+
+// ============================ TRAINER ============================
+// Les commandes passent l'une après l'autre (le Control Point n'en traite qu'une à la fois).
+function commande(nom, octets, silencieux) {
+  if (!TR.cp) return Promise.resolve(null);
+  const tache = TR.file.then(() => envoyer(nom, octets, silencieux));
+  TR.file = tache.catch(() => {});
+  return tache;
+}
+async function envoyer(nom, octets, silencieux) {
+  const cp = TR.cp;
+  if (!cp) return null;
+  const data = Uint8Array.from(octets);
+  if (!silencieux) log("→ " + nom + " : " + hex(new DataView(data.buffer)));
+  const attendre = new Promise((resolve) => {
+    TR.attente = { op: octets[0], silencieux, resolve, t: setTimeout(() => { log("⚠ pas de réponse à « " + nom + " » (3 s)"); TR.attente = null; resolve(null); }, 3000) };
+  });
+  try {
+    if (cp.writeValueWithResponse) await cp.writeValueWithResponse(data); else await cp.writeValue(data);
+  } catch (e) {
+    if (TR.attente) { clearTimeout(TR.attente.t); TR.attente = null; }
+    log("⚠ écriture « " + nom + " » impossible : " + e.name + " – " + e.message);
+    return null;
+  }
+  return attendre;
+}
+function reponseControle(dv) {
+  const b = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+  const calme = TR.attente && TR.attente.silencieux && b[0] === 0x80 && b[2] === 1;   // succès d'une commande de routine : pas de bruit
+  if (!calme) {
+    log("← Control Point : " + hex(dv));
+    if (b[0] === 0x80) log("   réponse à l'opcode 0x" + b[1].toString(16) + " : " + (RESULTATS[b[2]] || "code " + b[2]));
+  }
+  if (b[0] === 0x80 && TR.attente && TR.attente.op === b[1]) {
+    clearTimeout(TR.attente.t); const r = TR.attente.resolve; TR.attente = null; r(b[2]);
+  }
+}
+
+async function connecterTrainer() {
+  TR.connexion = true; majBoutonsBle();
+  try {
+    log("Recherche du trainer…");
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [0x1826] }, { services: [0x1818] }],
+      optionalServices: [0x1826, 0x1818, 0x180f, 0x180a]
+    });
+    await ouvrirTrainer(device);
+  } catch (e) {
+    erreurBle("Trainer", e);
+    if (TR.device && TR.device.gatt && TR.device.gatt.connected) TR.device.gatt.disconnect();
+  }
+  TR.connexion = false; majBoutonsBle();
+}
+
+async function ouvrirTrainer(device) {
+  Object.assign(TR, { device, cp: null, connecte: false, controle: false, ftms: null, power: null, precPower: null,
+    cadManivelle: 0, tManivelle: 0, dernier: 0, attente: null, file: Promise.resolve(), enVol: false,
+    penteEnvoyee: null, penteLog: null, tPente: 0, tVerif: 0, echecs: 0 });
+  device.addEventListener("gattserverdisconnected", surDeconnexionTrainer);
+  const server = await device.gatt.connect();
+  log("Trainer connecté : " + (device.name || "(sans nom)"));
+  const c = await inventaire(server);
+
+  const feat = c[canon(0x2acc)];
+  if (feat) {
+    try {
+      const dv = await feat.readValue();
+      const cible = dv.getUint32(4, true);
+      log("Commandes supportées : puissance cible " + (cible & (1 << 3) ? "oui" : "non") + ", simulation de pente " + (cible & (1 << 13) ? "oui" : "non"));
+    } catch (e) { log("⚠ lecture FTMS Feature : " + e.message); }
+  }
+  if (!c[canon(0x2ad2)] && !c[canon(0x2a63)]) throw new Error("ni Indoor Bike Data ni Cycling Power : trainer non compatible");
+  if (c[canon(0x2ad2)]) await abonner(c[canon(0x2ad2)], "Indoor Bike Data", (dv) => {
+    try { TR.ftms = parseIndoorBike(dv); TR.dernier = performance.now(); } catch (e) { log("⚠ paquet FTMS illisible : " + hex(dv)); }
+  });
+  if (c[canon(0x2a63)]) await abonner(c[canon(0x2a63)], "Cycling Power Measurement", (dv) => {
+    try {
+      const r = parseCyclingPower(dv);
+      const cad = cadenceManivelle(TR.precPower, r);
+      if (cad !== undefined) { TR.cadManivelle = cad; TR.tManivelle = performance.now(); }
+      TR.precPower = r; TR.power = r; TR.dernier = performance.now();
+    } catch (e) { log("⚠ paquet Cycling Power illisible : " + hex(dv)); }
+  });
+  if (c[canon(0x2ada)]) await abonner(c[canon(0x2ada)], "FTMS Status", (dv) => {
+    if (dv.getUint8(0) !== 0x12) log("Status FTMS : " + hex(dv));     // 0x12 = écho de la pente : trop fréquent pour le journal
+  });
+  if (c[canon(0x2ad9)]) { TR.cp = c[canon(0x2ad9)]; await abonner(TR.cp, "Control Point", reponseControle); }
+
+  TR.connecte = true;
+  // La montée repart du bas à la première connexion (ou si la précédente était terminée) ;
+  // après une déconnexion accidentelle en cours de route, elle reprend là où elle s'est arrêtée.
+  const reprise = etat.pauseAuto && !etat.fini;
+  etat.pauseAuto = false;
+  if (!reprise) recommencer();
+  etat.pause = false; majPause();
+  majSources(); majBoutonsBle();
+
+  if (!TR.cp) { log("Pas de Control Point : la résistance ne sera pas commandée."); info("Trainer connecté, sans commande de la résistance."); return; }
+  const r = await commande("Request Control", OCTETS_CONTROLE);
+  if (r === 1) {
+    TR.controle = true;
+    commande("Start or Resume", OCTETS_DEMARRAGE);
+    log("Contrôle du trainer obtenu.");
+    info("Trainer connecté : la résistance suit la pente du col.");
+  } else {
+    log("⚠ contrôle du trainer non obtenu.");
+    info("⚠ Trainer connecté, mais il refuse la commande de la résistance.");
+  }
+}
+
+function surDeconnexionTrainer() {
+  const etait = TR.connecte;
+  TR.connecte = false; TR.controle = false; TR.cp = null; TR.enVol = false;
+  log("Trainer déconnecté.");
+  if (etait) { etat.pause = true; etat.pauseAuto = true; majPause(); info("Trainer déconnecté : partie en pause."); }
+  relireCurseurs(); majSources(); majBoutonsBle();
+}
+async function deconnecterTrainer() {
+  if (TR.controle) await commande("Stop", OCTETS_STOP);
+  if (TR.device && TR.device.gatt.connected) TR.device.gatt.disconnect();
+}
+
+// La pente envoyée au trainer est la pente lissée du noyau (la même que celle de la physique).
+// On n'envoie que si elle a changé d'au moins SEUIL_PENTE, et au plus une fois par seconde.
+// Au sommet, on envoie 0 % pour que la fin de séance soit à plat.
+const SEUIL_PENTE = 0.2, RENVOI_MS = 30000;
+function majCommandePente(maintenant) {
+  if (!TR.connecte || !TR.controle || TR.enVol || TR.echecs >= 3) return;
+  if (maintenant - TR.tVerif < 1000) return;
+  TR.tVerif = maintenant;
+  const cible = Math.round((etat.fini ? 0 : penteA(etat.d)) * 10) / 10;
+  const ecart = TR.penteEnvoyee === null ? Infinity : Math.abs(cible - TR.penteEnvoyee);
+  if (ecart < SEUIL_PENTE && maintenant - TR.tPente < RENVOI_MS) return;
+  TR.enVol = true;
+  commande("Pente " + cible + " %", octetsSimulation(cible), true).then((r) => {
+    TR.enVol = false;
+    if (r === 1) {
+      TR.penteEnvoyee = cible; TR.tPente = performance.now(); TR.echecs = 0;
+      if (TR.penteLog === null || Math.abs(cible - TR.penteLog) >= 1) { TR.penteLog = cible; log("Pente envoyée : " + cible + " %"); }
+    } else if (TR.connecte) {
+      TR.echecs++;
+      log("⚠ pente " + cible + " % non confirmée (essai " + TR.echecs + "/3)");
+      if (TR.echecs >= 3) info("⚠ Le trainer ne confirme plus les commandes de pente.");
+    }
+  });
+}
+
+// ============================ CARDIO ============================
+async function connecterFc() {
+  FC.connexion = true; majBoutonsBle();
+  try {
+    log("Recherche du capteur cardio…");
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [0x180d] }],
+      exclusionFilters: [{ namePrefix: "Zwift" }, { namePrefix: "ZWIFT" }],    // le Hub expose un service cardio vide
+      optionalServices: [0x180d, 0x180f, 0x180a]
+    });
+    FC.device = device; FC.hr = null; FC.dernier = 0;
+    device.addEventListener("gattserverdisconnected", surDeconnexionFc);
+    const server = await device.gatt.connect();
+    log("Capteur cardio connecté : " + (device.name || "(sans nom)"));
+    const c = await inventaire(server);
+    if (!c[canon(0x2a37)]) throw new Error("pas de mesure de fréquence cardiaque standard");
+    await abonner(c[canon(0x2a37)], "Heart Rate Measurement", (dv) => {
+      try { FC.hr = parseHR(dv); FC.dernier = performance.now(); } catch (e) { log("⚠ paquet cardio illisible : " + hex(dv)); }
+    });
+    FC.connecte = true; majSources();
+  } catch (e) {
+    erreurBle("Capteur cardio", e);
+    if (FC.device && FC.device.gatt && FC.device.gatt.connected) FC.device.gatt.disconnect();
+  }
+  FC.connexion = false; majBoutonsBle();
+}
+function surDeconnexionFc() {
+  const etait = FC.connecte;
+  FC.connecte = false;
+  log("Capteur cardio déconnecté.");
+  if (etait) info("Capteur cardio déconnecté.");
+  relireCurseurs(); majSources(); majBoutonsBle();
+}
+function deconnecterFc() { if (FC.device && FC.device.gatt.connected) FC.device.gatt.disconnect(); }
+
+$("bTrainer").addEventListener("click", () => { if (TR.connexion) return; if (TR.connecte) deconnecterTrainer(); else connecterTrainer(); });
+$("bFc").addEventListener("click", () => { if (FC.connexion) return; if (FC.connecte) deconnecterFc(); else connecterFc(); });
+if (!navigator.bluetooth) {
+  $("bTrainer").disabled = true; $("bFc").disabled = true;
+  info("Web Bluetooth n'est pas disponible dans ce navigateur : utilise Chrome (ou Edge). Les curseurs de simulation restent utilisables.");
+}
+majBoutonsBle(); majSources(); majPause();
+log("Page prête.");
+
+/* =====================================================================
+   PARTIE 5 - LA BOUCLE PRINCIPALE
+   ===================================================================== */
+let dernier = performance.now();
+function boucle(maintenant) {
+  let dt = (maintenant - dernier) / 1000;
+  dernier = maintenant;
+  dt = Math.min(dt, 0.25);                   // onglet resté en arrière-plan : pas de grand saut
+  majEntreesBle(maintenant);
+  if (!etat.pause && !etat.fini) {
+    avancer(dt * etat.vitesseTemps);
+    if (etat.v > 0) phasePedale += entree.cadence / 60 * 2 * Math.PI * dt;   // animation en temps réel
+  }
+  majCommandePente(maintenant);
+  dessiner();
+  majMesures();
+  requestAnimationFrame(boucle);
+}
+ajusterCanvas();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>

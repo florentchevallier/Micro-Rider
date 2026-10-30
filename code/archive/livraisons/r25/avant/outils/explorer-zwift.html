@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro-Rider · Explorateur de commandes Zwift</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0b1626;color:#d6e4f5;font:14px system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px} p{color:#9db4d0;line-height:1.5;margin:6px 0}
+button,select{font:inherit;color:#e6eff7;background:#1a2e46;border:1px solid #50637a;padding:8px 12px;border-radius:7px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default} button.fort{background:#2c6b5e;border-color:#4fa38f}
+.ligne{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
+#etape{background:#12263f;border:1px solid #3d5876;border-radius:10px;padding:12px;margin:10px 0}
+#etape b{font-size:18px;color:#ffdd62}
+pre{background:#07101c;border:1px solid #27405c;border-radius:8px;padding:10px;height:380px;overflow:auto;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;margin:8px 0}
+.n{color:#ffdd62} .e{color:#ff9b9b} .i{color:#8ec5ff} .d{color:#b6e4cf}
+label{display:flex;gap:6px;align-items:center}
+</style>
+</head>
+<body>
+<main>
+<h1>Explorateur de commandes Zwift</h1>
+<p>Outil de diagnostic : il se connecte à un appareil Bluetooth (Zwift Click, Zwift Ride, Zwift Play…), écoute tout ce qu'il envoie et le note dans un journal, à envoyer ensuite. Il <b>n'envoie rien d'autre</b> que la phrase d'accueil « RideOn » (si l'appareil Zwift la demande) et ne modifie rien. À utiliser dans Chrome (ou Edge) sur un ordinateur ; l'appareil doit <b>ne pas être connecté ailleurs</b> (fermer l'application Zwift ou Companion, désactiver le Bluetooth du téléphone si besoin) et être réveillé (appuyer sur un bouton).</p>
+<div class="ligne">
+  <button id="bConnecter" class="fort">1 · Connecter un appareil</button>
+  <label title="Si tu ne vois pas l'appareil dans la liste, coche cette case pour voir tous les appareils Bluetooth"><input type="checkbox" id="tous"> afficher tous les appareils</label>
+  <label title="Le Click et le Ride attendent ce message avant de parler"><input type="checkbox" id="rideon" checked> envoyer « RideOn »</label>
+  <button id="bDeconnecter" disabled>Déconnecter</button>
+  <span id="statut" class="i">non connecté</span>
+</div>
+<div id="etape">
+  <div><b id="etapeTitre">Test guidé</b></div>
+  <p id="etapeTexte">Après la connexion, clique sur « Suivant » à chaque commande : appuie ensuite dessus <b>3 fois</b> (un appui net, puis tu relâches), en laissant une seconde entre les appuis. Chaque étape est marquée dans le journal.</p>
+  <div class="ligne"><button id="bSuivant" disabled>Suivant →</button><button id="bPrecedent" disabled>← Précédent</button><span id="compteur"></span></div>
+</div>
+<div class="ligne">
+  <input id="note" placeholder="Note libre (par ex. « j'ai appuyé sur le bouton vert »)" style="flex:1;min-width:220px;background:#07101c;color:#d6e4f5;border:1px solid #50637a;border-radius:7px;padding:8px">
+  <button id="bNote">Ajouter au journal</button>
+</div>
+<div class="ligne">
+  <button id="bTelecharger">Télécharger le journal (.txt)</button><button id="bCopier">Copier</button><button id="bEffacer">Effacer</button>
+  <span id="nb" class="d"></span>
+</div>
+<pre id="journal" aria-live="off"></pre>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const ZWIFT = "00000001-19ca-4651-86e5-fa29dcdd09d1", RIDEON = [0x52, 0x69, 0x64, 0x65, 0x4f, 0x6e];
+const FC82 = "0000fc82-0000-1000-8000-00805f9b34fb";
+// Services dont l'accès doit être déclaré à l'avance (Web Bluetooth) : on liste les plus courants + ceux de Zwift.
+const SERVICES = [ZWIFT, FC82, "generic_access", "generic_attribute", "device_information", "battery_service", "cycling_power", "cycling_speed_and_cadence", "fitness_machine", "heart_rate", "human_interface_device", "automation_io", "user_data",
+  "00001826-0000-1000-8000-00805f9b34fb", "0000fff0-0000-1000-8000-00805f9b34fb", "0000fe59-0000-1000-8000-00805f9b34fb"];
+const ETAPES = [
+  "Ne touche à rien pendant 5 secondes (état de repos)",
+  "CROIX : haut ▲", "CROIX : bas ▼", "CROIX : gauche ◀", "CROIX : droite ▶",
+  "4 BOUTONS : le bouton ORANGE", "4 BOUTONS : le bouton BLEU", "4 BOUTONS : le bouton VERT", "4 BOUTONS : le bouton ROSE",
+  "Bouton « Z » (logo) côté GAUCHE", "Bouton « Z » (logo) côté DROIT",
+  "PALETTE de gauche (orange) : appui léger, puis complet",
+  "PALETTE de droite (orange) : appui léger, puis complet",
+  "DIRECTION (steering) : tourne lentement le guidon à gauche, reviens au centre, puis à droite, reviens au centre",
+  "FREIN (si distinct des palettes) : appui léger, puis complet",
+  "Deux commandes en même temps (par ex. croix haut + bouton orange)",
+  "Fin : ne touche à rien pendant 5 secondes"
+];
+const t0 = performance.now(); let etape = -1, appareil = null, nbNotifs = 0, session = 0;
+const lignes = [];
+const hex = (dv) => Array.from(new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+const ts = () => ((performance.now() - t0) / 1000).toFixed(3).padStart(9);
+
+function ecrire(texte, classe = "") {
+  lignes.push(texte); const pre = $("journal"), bas = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+  const s = document.createElement("span"); if (classe) s.className = classe; s.textContent = texte + "\n"; pre.append(s);
+  if (bas) pre.scrollTop = pre.scrollHeight; $("nb").textContent = nbNotifs + " messages reçus";
+}
+const info = (m) => ecrire(ts() + "  " + m, "i"), erreur = (m) => ecrire(ts() + "  ⚠ " + m, "e");
+
+// Décodage « protobuf » au mieux : octet de type, puis champs (numéro:valeur). Affiché en plus de l'hexadécimal brut.
+function decoder(o) {
+  const out = []; let i = 1;
+  while (i < o.length) {
+    const cle = o[i++], num = cle >> 3, type = cle & 7;
+    if (type === 0) { let v = 0, dec = 0, b; do { if (i >= o.length) return null; b = o[i++]; v += (b & 0x7f) * Math.pow(2, dec); dec += 7; } while (b & 0x80); out.push(num + ":" + v); }
+    else if (type === 2) { let n = 0, dec = 0, b; do { if (i >= o.length) return null; b = o[i++]; n |= (b & 0x7f) << dec; dec += 7; } while (b & 0x80); if (i + n > o.length) return null; out.push(num + ":[" + Array.from(o.slice(i, i + n)).map((x) => x.toString(16).padStart(2, "0")).join(" ") + "]"); i += n; }
+    else if (type === 5) { if (i + 4 > o.length) return null; out.push(num + ":f32(" + Array.from(o.slice(i, i + 4)).map((x) => x.toString(16).padStart(2, "0")).join(" ") + ")"); i += 4; }
+    else if (type === 1) { if (i + 8 > o.length) return null; out.push(num + ":f64"); i += 8; }
+    else return null;
+  }
+  return out.join(" ");
+}
+function surNotif(ma, uuidCourt, dv) {
+  if (ma !== session) return; nbNotifs++;
+  const o = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength), d = o.length > 1 ? decoder(o) : null;
+  ecrire(ts() + "  " + uuidCourt + "  [" + o.length + "]  " + hex(dv) + (d ? "    → type " + o[0].toString(16).padStart(2, "0") + " : " + d : ""), "d");
+}
+const court = (u) => (u.startsWith("0000") && u.endsWith("-0000-1000-8000-00805f9b34fb")) ? "0x" + u.slice(4, 8) : u.startsWith("0000000") && u.endsWith("-19ca-4651-86e5-fa29dcdd09d1") ? "zwift/" + u.slice(7, 8) : u;
+const props = (c) => ["broadcast", "read", "writeWithoutResponse", "write", "notify", "indicate"].filter((p) => c.properties[p]).join(",");
+
+async function connecter() {
+  if (!navigator.bluetooth) { erreur("Ce navigateur ne gère pas le Bluetooth web : utilise Chrome ou Edge sur ordinateur."); return; }
+  try {
+    const options = $("tous").checked ? { acceptAllDevices: true, optionalServices: SERVICES }
+      : { filters: [{ namePrefix: "Zwift" }, { namePrefix: "ZWIFT" }, { namePrefix: "Ride" }, { services: [ZWIFT] }, { services: [FC82] }], optionalServices: SERVICES };
+    const device = await navigator.bluetooth.requestDevice(options);
+    session++; const ma = session; appareil = device; nbNotifs = 0;
+    ecrire(""); info("Appareil choisi : « " + (device.name || "(sans nom)") + " »"); $("statut").textContent = "connexion…";
+    device.addEventListener("gattserverdisconnected", () => { if (ma !== session) return; info("Appareil déconnecté."); $("statut").textContent = "déconnecté"; $("bDeconnecter").disabled = true; });
+    const serveur = await device.gatt.connect(); info("Connecté.");
+    const services = await serveur.getPrimaryServices(); info(services.length + " service(s) accessible(s) : " + services.map((s) => court(s.uuid)).join(", "));
+    let zwiftEcriture = null;
+    for (const s of services) {
+      let cars = []; try { cars = await s.getCharacteristics(); } catch (e) { erreur("service " + court(s.uuid) + " : " + e.message); continue; }
+      for (const c of cars) {
+        ecrire(ts() + "  service " + court(s.uuid) + "  car " + court(c.uuid) + "  propriétés : " + props(c), "i");
+        if (c.properties.read && !(s.uuid === ZWIFT)) { try { const v = await c.readValue(); ecrire(ts() + "      lecture : " + hex(v) + "   (« " + new TextDecoder().decode(v).replace(/[^\x20-\x7e]/g, "·") + " »)", "i"); } catch (e) { /* illisible : normal */ } }
+        if (s.uuid === ZWIFT && c.uuid.startsWith("00000003")) zwiftEcriture = c;
+        if (c.properties.notify || c.properties.indicate) {
+          c.addEventListener("characteristicvaluechanged", (e) => surNotif(ma, court(c.uuid), e.target.value));
+          try { await c.startNotifications(); } catch (e) { erreur("abonnement " + court(c.uuid) + " : " + e.message); }
+        }
+      }
+    }
+    if ($("rideon").checked && zwiftEcriture) {
+      const data = Uint8Array.from(RIDEON);
+      try { if (zwiftEcriture.properties.writeWithoutResponse) await zwiftEcriture.writeValueWithoutResponse(data); else await zwiftEcriture.writeValue(data); info("« RideOn » envoyé."); }
+      catch (e) { erreur("envoi de RideOn : " + e.message); }
+    } else if ($("rideon").checked) info("Pas de service Zwift trouvé : « RideOn » non envoyé.");
+    $("statut").textContent = "connecté : " + (device.name || ""); $("bDeconnecter").disabled = false; $("bSuivant").disabled = false; $("bPrecedent").disabled = false;
+    info("Prêt. Clique sur « Suivant » pour commencer le test guidé, ou appuie simplement sur les commandes.");
+  } catch (e) { erreur(e.name === "NotFoundError" ? "Aucun appareil choisi (ou aucun trouvé : réveille l'appareil, ou coche « afficher tous les appareils »)." : e.name + " : " + e.message); $("statut").textContent = "non connecté"; }
+}
+function allerEtape(n) {
+  etape = Math.max(0, Math.min(ETAPES.length - 1, n));
+  $("etapeTitre").textContent = "Étape " + (etape + 1) + " / " + ETAPES.length; $("etapeTexte").innerHTML = ""; const b = document.createElement("b"); b.textContent = ETAPES[etape]; $("etapeTexte").append(b, document.createTextNode(etape === 0 || etape === ETAPES.length - 1 ? "" : " — 3 appuis nets, une seconde entre chaque, puis clique sur Suivant."));
+  $("compteur").textContent = ""; ecrire(ts() + "  ===== ÉTAPE " + (etape + 1) + " : " + ETAPES[etape] + " =====", "n");
+}
+function journalComplet() {
+  return "Micro-Rider · explorateur de commandes Zwift\n" + new Date().toISOString() + "\n" + navigator.userAgent + "\nAppareil : " + (appareil ? appareil.name : "?") + "\n\n" + lignes.join("\n") + "\n";
+}
+$("bConnecter").onclick = connecter;
+$("bDeconnecter").onclick = () => { session++; if (appareil && appareil.gatt.connected) appareil.gatt.disconnect(); info("Déconnecté."); $("statut").textContent = "déconnecté"; $("bDeconnecter").disabled = true; };
+$("bSuivant").onclick = () => allerEtape(etape + 1); $("bPrecedent").onclick = () => allerEtape(etape - 1);
+$("bNote").onclick = () => { const v = $("note").value.trim(); if (v) { ecrire(ts() + "  NOTE : " + v, "n"); $("note").value = ""; } };
+$("note").addEventListener("keydown", (e) => { if (e.key === "Enter") $("bNote").click(); });
+$("bEffacer").onclick = () => { lignes.length = 0; $("journal").textContent = ""; nbNotifs = 0; $("nb").textContent = ""; };
+$("bCopier").onclick = async () => { try { await navigator.clipboard.writeText(journalComplet()); $("bCopier").textContent = "Copié ✓"; setTimeout(() => { $("bCopier").textContent = "Copier"; }, 1500); } catch (e) { erreur("copie impossible : " + e.message); } };
+$("bTelecharger").onclick = () => {
+  const a = document.createElement("a"), nom = "journal-zwift-" + new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19) + ".txt";
+  a.href = URL.createObjectURL(new Blob([journalComplet()], { type: "text/plain" })); a.download = nom; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+info("Prêt. Clique sur « 1 · Connecter un appareil ».");
+</script>
+</body>
+</html>

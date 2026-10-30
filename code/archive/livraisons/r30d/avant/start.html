@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro-Rider · Start</title>
+<style>
+:root{--fond:#0b1220;--carte:#121c30;--trait:#26385a;--texte:#e8f0fb;--doux:#93a7c6;--accent:#4ee7e8;--chaud:#ffd24a}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#16264a,var(--fond));color:var(--texte);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100svh}
+main{max-width:760px;margin:auto;padding:16px 16px 48px}
+nav{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;font-size:13px}
+nav .lab{color:var(--doux);margin-right:4px}
+nav a,nav button{color:var(--texte);background:var(--carte);border:1px solid var(--trait);border-radius:8px;padding:6px 11px;text-decoration:none;font:inherit;cursor:pointer}
+nav a:hover,nav button:hover{border-color:var(--accent)}
+h1{margin:56px 0 4px;text-align:center;font-size:clamp(34px,8vw,56px);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.sub{text-align:center;color:var(--doux);margin:0 0 36px}
+.go{display:block;width:min(420px,100%);margin:0 auto;padding:22px 16px;text-align:center;text-decoration:none;font-size:26px;font-weight:700;letter-spacing:.04em;color:#07101f;background:linear-gradient(180deg,#ffe36b,#ffb52e);border-radius:16px;box-shadow:0 10px 30px #ffb52e44}
+.go:hover{filter:brightness(1.06)}
+.go:focus-visible,nav a:focus-visible,nav button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+#navok{text-align:center;margin:14px 0 0;font-size:14px;color:var(--doux)}
+#navok.mauvais{color:#ff9b8f}
+details{margin:28px auto 0;max-width:640px;background:var(--carte);border:1px solid var(--trait);border-radius:12px;padding:4px 16px}
+summary{cursor:pointer;padding:12px 0;text-align:center;font-weight:600;color:var(--chaud)}
+details[open] summary{border-bottom:1px solid var(--trait);margin-bottom:10px}
+ol{padding-left:22px}li{margin:8px 0}
+.petit{color:var(--doux);font-size:14px}
+code,kbd{background:#050c18;border:1px solid var(--trait);border-radius:5px;padding:1px 6px;font:13px ui-monospace,monospace}
+#etat{text-align:center;color:var(--doux);font-size:13px;min-height:1.4em;margin-top:8px}
+</style>
+</head>
+<body>
+<main>
+  <nav aria-label="Diagnostics">
+    <span class="lab">Diagnostics:</span>
+    <a href="ble-diagnostic.html">Bluetooth</a>
+    <a href="ble-click.html">Zwift Click</a>
+    <a href="jeu-chain4.html">Chain Four</a>
+    <a href="jeu-bataille.html">Battleship</a>
+    <button id="bRapport" type="button" title="Copies browser info and the last app log, to paste into a message">Copy report</button>
+  </nav>
+  <div id="etat" role="status" aria-live="polite"></div>
+
+  <h1>Micro-Rider</h1>
+  <p class="sub">A virtual ride companion for your indoor trainer</p>
+
+  <a class="go" href="micro-rider.html">▶ Launch</a>
+  <p id="navok"></p>
+
+  <details>
+    <summary>Open the guide</summary>
+    <ol>
+      <li><b>Use Chrome (or Edge)</b> on a computer. Bluetooth needs Chrome; Safari and Firefox won't connect to a trainer.</li>
+      <li><b>Close other apps</b> that hold the trainer (Zwift, phone apps, watch). A trainer talks to one app at a time.</li>
+      <li>Click <b>Launch</b>, then <b>Connect trainer</b> and pick your trainer in Chrome's list. Wake it first by pedalling a few turns. Optional: connect heart rate, cadence, or a Zwift Click.</li>
+      <li>No hardware? Scroll to the bottom of the app and open <b>Simulation (no hardware)</b>: sliders stand in for power, cadence and heart rate.</li>
+      <li>Choose a workout (or <i>No workout</i> for a free ride) and press <b>Start</b>. Pedal: the scenery scrolls with your speed.</li>
+      <li>The <b>🕹️ button</b> (top left of the animation) opens the arcade cabinet: games on its screen, arrows + <kbd>Enter</kbd> to play, <kbd>Esc</kbd> back to the games menu. After 45 s idle it shows a slideshow.</li>
+    </ol>
+    <p class="petit"><b>Something wrong?</b> Press <b>Copy report</b> at the top of this page and paste it into your message to me: it holds your browser info and the app's latest log. For Bluetooth problems, the diagnostic pages at the top help to see what the device exposes.</p>
+  </details>
+</main>
+<script>
+(function () {
+  const ok = !!(navigator.bluetooth), chrome = /Chrome\//.test(navigator.userAgent);
+  const n = document.getElementById("navok");
+  if (!ok) { n.textContent = "⚠ This browser has no Web Bluetooth: use Chrome or Edge for a real trainer. The simulation still works."; n.className = "mauvais"; }
+  else n.textContent = "Web Bluetooth available ✓";
+  const etat = document.getElementById("etat");
+  document.getElementById("bRapport").addEventListener("click", async () => {
+    let journal = "";
+    try { journal = localStorage.getItem("micro-rider.journal") || ""; } catch (e) { /* stockage indisponible */ }
+    const rapport = [
+      "Micro-Rider report · " + new Date().toISOString(),
+      "Page: " + location.href,
+      "Browser: " + navigator.userAgent,
+      "Web Bluetooth: " + (ok ? "yes" : "no") + " · Chrome: " + (chrome ? "yes" : "no"),
+      "Screen: " + screen.width + "×" + screen.height + " @" + window.devicePixelRatio + " · window " + innerWidth + "×" + innerHeight,
+      "", "--- app log (latest lines) ---", journal || "(no log yet: launch the app first)"
+    ].join("\n");
+    try { await navigator.clipboard.writeText(rapport); etat.textContent = "Report copied ✓ Paste it into your message."; }
+    catch (e) {
+      const t = document.createElement("textarea"); t.value = rapport; t.style.cssText = "width:100%;height:160px"; etat.replaceChildren(document.createTextNode("Automatic copy failed: select all and copy this text."), t); t.select();
+    }
+  });
+})();
+</script>
+</body>
+</html>

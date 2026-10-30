@@ -1,0 +1,48 @@
+{
+  "pedalage-boucle-85rpm.wav": {
+    "duration_seconds": 8.470583,
+    "sample_rate": 48000,
+    "channels": 2,
+    "bits": 16,
+    "seamless_loop": true,
+    "peak_dbfs": -13.78,
+    "rms_dbfs": -27.0,
+    "details": "Transmission douce, maillage de chaîne et pneus sur asphalte. 12 tours de pédalier à 85 tr/min. Roulement de référence ~25 km/h, indicatif.",
+    "sha256": "d99e9f6ad2bdda8cf259bb006a2ad3bccc00324dc31a7c8fe801f2f7fd5b51ba",
+    "boundary_jump": 0.0019114
+  },
+  "roue-libre-boucle.wav": {
+    "duration_seconds": 8.0,
+    "sample_rate": 48000,
+    "channels": 2,
+    "bits": 16,
+    "seamless_loop": true,
+    "peak_dbfs": -13.13,
+    "rms_dbfs": -27.0,
+    "details": "Roue libre continue, cliquetis mécanique à 96 impacts/s et roulement discret. Vitesse indicative ~25 km/h ; pas un modèle de moyeu précis. Aucun ralentissement imposé dans le fichier.",
+    "sha256": "745ba7843f7c3d189718d64c17a0586f712a3d82cfe0949a5d6d0bda342c2374",
+    "boundary_jump": 0.0146147
+  },
+  "oiseaux-ambiance.wav": {
+    "duration_seconds": 22.0,
+    "sample_rate": 48000,
+    "channels": 2,
+    "bits": 16,
+    "seamless_loop": false,
+    "peak_dbfs": -9.86,
+    "rms_dbfs": -31.0,
+    "details": "Quatre groupes de petits oiseaux espacés sur 22 secondes. Appels synthétiques stylisés, sans espèce revendiquée. Stéréo discrète ; silences conservés. À jouer ponctuellement, pas en boucle serrée.",
+    "sha256": "eaf3beea2fa475b1e1188d9fddcc9554807c98a9658d4b78b7608ee1d179e212"
+  },
+  "voiture-spider-passage-droite-gauche.wav": {
+    "duration_seconds": 10.0,
+    "sample_rate": 48000,
+    "channels": 2,
+    "bits": 16,
+    "seamless_loop": false,
+    "peak_dbfs": -8.98,
+    "rms_dbfs": -24.0,
+    "details": "Passage unique de droite vers gauche, roadster classique à quatre cylindres évoqué synthétiquement. Moteur chaud, pneus, léger Doppler. Aucun klaxon, aucune musique. Pas un enregistrement authentique d’Alfa Romeo.",
+    "sha256": "866fa767af8df678d77b7ba0fa7bc3ab5d6d290cb03a1628e7f1de3083b5a84b"
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "croix-neutre": {
+    "image": "commandes/croix-neutre.png",
+    "anchor": [
+      205.0,
+      161.69
+    ],
+    "visibleWidth": 394,
+    "sourceSheet": "planche-croix.png",
+    "sourceCrop": [
+      31,
+      183,
+      403,
+      343
+    ]
+  },
+  "croix-haut": {
+    "image": "commandes/croix-haut.png",
+    "anchor": [
+      206.0,
+      152.29
+    ],
+    "visibleWidth": 396,
+    "sourceSheet": "planche-croix.png",
+    "sourceCrop": [
+      458,
+      203,
+      411,
+      323
+    ]
+  },
+  "croix-bas": {
+    "image": "commandes/croix-bas.png",
+    "anchor": [
+      204.5,
+      162.63
+    ],
+    "visibleWidth": 393,
+    "sourceSheet": "planche-croix.png",
+    "sourceCrop": [
+      882,
+      180,
+      409,
+      345
+    ]
+  },
+  "croix-gauche": {
+    "image": "commandes/croix-gauche.png",
+    "anchor": [
+      210.0,
+      161.69
+    ],
+    "visibleWidth": 404,
+    "sourceSheet": "planche-croix.png",
+    "sourceCrop": [
+      1303,
+      182,
+      420,
+      343
+    ]
+  },
+  "croix-droite": {
+    "image": "commandes/croix-droite.png",
+    "anchor": [
+      200.0,
+      161.69
+    ],
+    "visibleWidth": 392,
+    "sourceSheet": "planche-croix.png",
+    "sourceCrop": [
+      1738,
+      183,
+      404,
+      343
+    ]
+  },
+  "bouton-relache": {
+    "image": "commandes/bouton-relache.png",
+    "anchor": [
+      251.5,
+      323.7
+    ],
+    "visibleWidth": 487,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      81,
+      152,
+      503,
+      401
+    ]
+  },
+  "bouton-enfonce": {
+    "image": "commandes/bouton-enfonce.png",
+    "anchor": [
+      243.5,
+      297.46
+    ],
+    "visibleWidth": 471,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      694,
+      184,
+      487,
+      369
+    ]
+  },
+  "touche-relachee": {
+    "image": "commandes/touche-relachee.png",
+    "anchor": [
+      278.0,
+      206.44
+    ],
+    "visibleWidth": 540,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      51,
+      827,
+      556,
+      258
+    ]
+  },
+  "touche-enfoncee": {
+    "image": "commandes/touche-enfoncee.png",
+    "anchor": [
+      260.5,
+      184.3
+    ],
+    "visibleWidth": 505,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      682,
+      854,
+      521,
+      231
+    ]
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "croix-neutre": {
+    "image": "commandes/croix-neutre-composee-v2.png",
+    "anchor": [
+      128,
+      128
+    ],
+    "visibleWidth": 150,
+    "sourceSheet": "planche-croix-v2.png",
+    "sourceCrop": [
+      0,
+      0,
+      256,
+      256
+    ]
+  },
+  "croix-haut": {
+    "image": "commandes/croix-haut-composee-v2.png",
+    "anchor": [
+      128,
+      128
+    ],
+    "visibleWidth": 150,
+    "sourceSheet": "planche-croix-v2.png",
+    "sourceCrop": [
+      256,
+      0,
+      256,
+      256
+    ]
+  },
+  "croix-bas": {
+    "image": "commandes/croix-bas-composee-v2.png",
+    "anchor": [
+      128,
+      128
+    ],
+    "visibleWidth": 150,
+    "sourceSheet": "planche-croix-v2.png",
+    "sourceCrop": [
+      512,
+      0,
+      256,
+      256
+    ]
+  },
+  "croix-gauche": {
+    "image": "commandes/croix-gauche-composee-v2.png",
+    "anchor": [
+      128,
+      128
+    ],
+    "visibleWidth": 150,
+    "sourceSheet": "planche-croix-v2.png",
+    "sourceCrop": [
+      768,
+      0,
+      256,
+      256
+    ]
+  },
+  "croix-droite": {
+    "image": "commandes/croix-droite-composee-v2.png",
+    "anchor": [
+      128,
+      128
+    ],
+    "visibleWidth": 150,
+    "sourceSheet": "planche-croix-v2.png",
+    "sourceCrop": [
+      1024,
+      0,
+      256,
+      256
+    ]
+  },
+  "bouton-relache": {
+    "image": "commandes/bouton-relache.png",
+    "anchor": [
+      251.5,
+      323.7
+    ],
+    "visibleWidth": 487,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      81,
+      152,
+      503,
+      401
+    ]
+  },
+  "bouton-enfonce": {
+    "image": "commandes/bouton-enfonce.png",
+    "anchor": [
+      243.5,
+      297.46
+    ],
+    "visibleWidth": 471,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      694,
+      184,
+      487,
+      369
+    ]
+  },
+  "touche-relachee": {
+    "image": "commandes/touche-relachee.png",
+    "anchor": [
+      278.0,
+      206.44
+    ],
+    "visibleWidth": 540,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      51,
+      827,
+      556,
+      258
+    ]
+  },
+  "touche-enfoncee": {
+    "image": "commandes/touche-enfoncee.png",
+    "anchor": [
+      260.5,
+      184.3
+    ],
+    "visibleWidth": 505,
+    "sourceSheet": "planche-boutons.png",
+    "sourceCrop": [
+      682,
+      854,
+      521,
+      231
+    ]
+  },
+  "croix-socle": {
+    "image": "commandes/croix-socle-v2.png",
+    "anchor": [
+      355.0,
+      334.5
+    ],
+    "visibleWidth": 694,
+    "sourceSheet": "planche-croix-couches.png",
+    "sourceCrop": [
+      99,
+      121,
+      710,
+      669
+    ]
+  },
+  "croix-capot": {
+    "image": "commandes/croix-capot-v2.png",
+    "anchor": [
+      392.5,
+      315.84999999999997
+    ],
+    "visibleWidth": 769,
+    "sourceSheet": "planche-croix-couches.png",
+    "sourceCrop": [
+      938,
+      112,
+      785,
+      671
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "frame": {
+    "file": "cadre.png",
+    "width": 1536,
+    "height": 1024,
+    "rear": [
+      288,
+      726
+    ],
+    "front": [
+      1317,
+      734
+    ],
+    "crank": [
+      716,
+      778
+    ]
+  },
+  "wheel": {
+    "file": "roue-six-batons.png",
+    "source": {
+      "x": 146,
+      "y": 142,
+      "w": 962,
+      "h": 976
+    },
+    "radiusPerWheelbase": 0.335,
+    "circumferenceMeters": 2.105
+  }
+}
